@@ -207,6 +207,11 @@ if __name__ == '__main__':
     np.random.seed(seed_val)
     torch.manual_seed(seed_val)
     torch.cuda.manual_seed_all(seed_val)
+    # Ensure deterministic behavior
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # For Python hashing
+    os.environ['PYTHONHASHSEED'] = str(seed_val)
 
 
     ''' set up device '''
@@ -274,8 +279,12 @@ if __name__ == '__main__':
     print('[INFO]dev_set size: ', len(dev_set))
     # print('[INFO]test_set size: ', len(test_set))
     
+    # Create generator for reproducible shuffling
+    generator = torch.Generator()
+    generator.manual_seed(seed_val)
+
     # train dataloader
-    train_dataloader = DataLoader(train_set, batch_size = batch_size, shuffle=True, num_workers=1)
+    train_dataloader = DataLoader(train_set, batch_size = batch_size, shuffle=True, num_workers=1, generator=generator)
     # dev dataloader
     val_dataloader = DataLoader(dev_set, batch_size = 1, shuffle=False, num_workers=1)
     # dataloaders

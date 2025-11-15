@@ -267,10 +267,15 @@ if __name__ == '__main__':
 
 
     ''' set random seeds '''
-    seed_val = 20 #500
+    seed_val = 312  # Match training seed for consistency
     np.random.seed(seed_val)
     torch.manual_seed(seed_val)
     torch.cuda.manual_seed_all(seed_val)
+    # Ensure deterministic behavior
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # For Python hashing
+    os.environ['PYTHONHASHSEED'] = str(seed_val)
 
     ''' set up device '''
     # use cuda

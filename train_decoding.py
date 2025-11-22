@@ -12,7 +12,7 @@ from glob import glob
 import time
 import copy
 from tqdm import tqdm
-from transformers import BertLMHeadModel, BartTokenizer, BartForConditionalGeneration, BartConfig, BartForSequenceClassification, BertTokenizer, BertConfig, BertForSequenceClassification, RobertaTokenizer, RobertaForSequenceClassification, PegasusForConditionalGeneration, PegasusTokenizer, T5Tokenizer, T5ForConditionalGeneration, BertGenerationEncoder, BertGenerationDecoder, EncoderDecoderConfig, EncoderDecoderModel
+from transformers import BertLMHeadModel, BartTokenizer, BartForConditionalGeneration, BartConfig, BartForSequenceClassification, BertTokenizer, BertConfig, BertForSequenceClassification, RobertaTokenizer, RobertaForSequenceClassification, PegasusForConditionalGeneration, PegasusTokenizer, T5Tokenizer, T5ForConditionalGeneration, BertGenerationEncoder, BertGenerationDecoder, EncoderDecoderConfig, EncoderDecoderModel, get_cosine_schedule_with_warmup
 from data import ZuCo_dataset
 from model_decoding import BrainTranslator, BrainTranslatorNaive, T5Translator
 from config import get_config
@@ -84,6 +84,8 @@ def train_model(dataloaders, device, model, criterion, optimizer, scheduler, num
                     if phase == 'train':
                         # with torch.autograd.detect_anomaly():
                         loss.sum().backward()
+                        # Clip gradients to prevent exploding gradients and loss spikes
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                         optimizer.step()
 
                 # statistics
@@ -349,9 +351,28 @@ if __name__ == '__main__':
     else:
 
         ''' set up optimizer and scheduler'''
-        optimizer_step1 = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=step1_lr, momentum=0.9)
+        # Use AdamW optimizer (state-of-the-art for transformers)
+        optimizer_step1 = optim.AdamW(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=step1_lr,
+            betas=(0.9, 0.999),
+            eps=1e-8,
+            weight_decay=0.01
+        )
 
-        exp_lr_scheduler_step1 = lr_scheduler.StepLR(optimizer_step1, step_size=20, gamma=0.1)
+        # Calculate total training steps for warmup
+        steps_per_epoch_step1 = len(dataloaders['train'])
+        total_steps_step1 = steps_per_epoch_step1 * num_epochs_step1
+        warmup_steps_step1 = int(0.1 * total_steps_step1)  # 10% warmup
+
+        # Use cosine schedule with warmup (smooth learning rate transitions)
+        exp_lr_scheduler_step1 = get_cosine_schedule_with_warmup(
+            optimizer_step1,
+            num_warmup_steps=warmup_steps_step1,
+            num_training_steps=total_steps_step1
+        )
+
+        print(f'[INFO] Step1 - Total steps: {total_steps_step1}, Warmup steps: {warmup_steps_step1}')
 
         ''' set up loss function '''
         criterion = nn.CrossEntropyLoss()
@@ -369,9 +390,28 @@ if __name__ == '__main__':
         param.requires_grad = True
 
     ''' set up optimizer and scheduler'''
-    optimizer_step2 = optim.SGD(model.parameters(), lr=step2_lr, momentum=0.9)
+    # Use AdamW optimizer
+    optimizer_step2 = optim.AdamW(
+        model.parameters(),
+        lr=step2_lr,
+        betas=(0.9, 0.999),
+        eps=1e-8,
+        weight_decay=0.01
+    )
 
-    exp_lr_scheduler_step2 = lr_scheduler.StepLR(optimizer_step2, step_size=30, gamma=0.1)
+    # Calculate total training steps for warmup
+    steps_per_epoch_step2 = len(dataloaders['train'])
+    total_steps_step2 = steps_per_epoch_step2 * num_epochs_step2
+    warmup_steps_step2 = int(0.1 * total_steps_step2)  # 10% warmup
+
+    # Use cosine schedule with warmup (smooth learning rate transitions)
+    exp_lr_scheduler_step2 = get_cosine_schedule_with_warmup(
+        optimizer_step2,
+        num_warmup_steps=warmup_steps_step2,
+        num_training_steps=total_steps_step2
+    )
+
+    print(f'[INFO] Step2 - Total steps: {total_steps_step2}, Warmup steps: {warmup_steps_step2}')
 
     ''' set up loss function '''
     criterion = nn.CrossEntropyLoss()

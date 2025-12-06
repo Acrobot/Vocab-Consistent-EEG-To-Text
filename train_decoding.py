@@ -257,9 +257,6 @@ if __name__ == '__main__':
     if not os.path.exists(cfg_dir):
         os.makedirs(cfg_dir)
 
-    with open(os.path.join(cfg_dir,f'{save_name}.json'), 'w') as out_config:
-        json.dump(args, out_config, indent = 4)
-
     if model_name in ['BrainTranslator','BrainTranslatorNaive']:
         tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
 
@@ -270,14 +267,33 @@ if __name__ == '__main__':
         tokenizer = T5Tokenizer.from_pretrained("t5-large")
         #tokenizer.set_prefix_tokens(language='english')
 
+    # Get text_unique_split option from config (defaults to False if not specified)
+    text_unique_split = args.get('text_unique_split', False)
+    print(f'[INFO]text_unique_split: {text_unique_split}')
+
     # train dataset
-    train_set = ZuCo_dataset(whole_dataset_dicts, 'train', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input)
+    train_set = ZuCo_dataset(whole_dataset_dicts, 'train', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input, text_unique_split=text_unique_split)
     # dev dataset
-    dev_set = ZuCo_dataset(whole_dataset_dicts, 'dev', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input)
+    dev_set = ZuCo_dataset(whole_dataset_dicts, 'dev', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input, text_unique_split=text_unique_split)
     # test dataset
     # test_set = ZuCo_dataset(whole_dataset_dicts, 'test', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting)
 
-    
+    # Save split indices in config if stratified split was used
+    if train_set.split_indices is not None:
+        # Convert defaultdicts to regular dicts for JSON serialization
+        split_indices_serializable = {}
+        for split_name, split_dict in train_set.split_indices.items():
+            split_indices_serializable[split_name] = {
+                str(dataset_idx): {subject: indices for subject, indices in subjects_dict.items()}
+                for dataset_idx, subjects_dict in split_dict.items()
+            }
+        args['split_indices'] = split_indices_serializable
+        print(f'[INFO] Added split indices to config')
+
+    # Save config with split indices
+    with open(os.path.join(cfg_dir,f'{save_name}.json'), 'w') as out_config:
+        json.dump(args, out_config, indent = 4)
+
     dataset_sizes = {'train': len(train_set), 'dev': len(dev_set)}
     print('[INFO]train_set size: ', len(train_set))
     print('[INFO]dev_set size: ', len(dev_set))

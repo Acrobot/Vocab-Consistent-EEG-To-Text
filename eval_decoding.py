@@ -319,8 +319,24 @@ if __name__ == '__main__':
         tokenizer = T5Tokenizer.from_pretrained("t5-large")
         # tokenizer.set_prefix_tokens(language='english')
 
+    # Load split indices from training config if available
+    loaded_split_indices = None
+    if 'split_indices' in training_config:
+        print('[INFO] Loading split indices from training config')
+        # Convert string keys back to integers for dataset_idx
+        split_indices = training_config['split_indices']
+        loaded_split_indices = {}
+        for split_name in ['train', 'dev', 'test']:
+            loaded_split_indices[split_name] = {
+                int(dataset_idx): subjects_dict
+                for dataset_idx, subjects_dict in split_indices[split_name].items()
+            }
+        print('[INFO] Successfully loaded split indices - using same train/dev/test split as training')
+    else:
+        print('[WARNING] No split indices found in training config - using default sequential split')
+
     # test dataset
-    test_set = ZuCo_dataset(whole_dataset_dicts, 'test', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=test_input)
+    test_set = ZuCo_dataset(whole_dataset_dicts, 'test', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=test_input, loaded_split_indices=loaded_split_indices)
 
     dataset_sizes = {"test_set":len(test_set)}
     print('[INFO]test_set size: ', len(test_set))

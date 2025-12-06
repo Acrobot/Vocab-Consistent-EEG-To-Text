@@ -164,7 +164,7 @@ def get_input_sample(sent_obj, tokenizer, eeg_type = 'GD', bands = ['_t1','_t2',
     return input_sample
 
 
-def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_ratio=0.8, dev_ratio=0.1, test_ratio=0.1, max_len=DEFAULT_MAX_LEN, random_state=42):
+def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_ratio=0.8, dev_ratio=0.1, test_ratio=0.1, max_len=DEFAULT_MAX_LEN, random_state=42, text_unique=False):
     """
     Create stratified train/dev/test splits based on token distribution.
     Ensures that each token appears proportionally across all splits.
@@ -178,6 +178,7 @@ def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_rati
         test_ratio: Proportion for test set (default 0.1)
         max_len: Maximum sequence length for tokenization
         random_state: Random seed for reproducibility
+        text_unique: If True, ensures same text never appears in multiple splits (default False)
 
     Returns:
         train_indices: dict mapping {dataset_idx: {subject: [sentence_indices]}}
@@ -185,11 +186,19 @@ def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_rati
         test_indices: dict mapping {dataset_idx: {subject: [sentence_indices]}}
     """
 
-    print('[INFO] Creating stratified split based on token distribution...')
+    if text_unique:
+        print('[INFO] Creating stratified split with text-unique constraint (same text never in multiple splits)...')
+    else:
+        print('[INFO] Creating stratified split based on token distribution...')
 
     # Step 1: Collect all sentences and tokenize them
-    all_sentences = []  # List of (dataset_idx, subject, sent_idx, sent_obj)
-    all_token_ids = []  # List of token ID sets for each sentence
+    if text_unique:
+        # Group by text content first
+        text_to_instances = defaultdict(list)  # text -> [(dataset_idx, subject, sent_idx)]
+        text_to_tokens = {}  # text -> set of token IDs
+
+    all_sentences = []  # List of (dataset_idx, subject, sent_idx) or (text_key,) for text_unique
+    all_token_ids = []  # List of token ID sets
 
     # Track statistics
     total_sentences = 0
@@ -226,13 +235,31 @@ def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_rati
                 # Extract non-padding tokens
                 non_padding_tokens = token_ids[attention_mask == 1].tolist()
 
-                all_sentences.append((dataset_idx, subject, sent_idx))
-                all_token_ids.append(set(non_padding_tokens))
+                if text_unique:
+                    # Group by text content
+                    text_to_instances[target_string].append((dataset_idx, subject, sent_idx))
+                    if target_string not in text_to_tokens:
+                        text_to_tokens[target_string] = set(non_padding_tokens)
+                else:
+                    # Keep individual sentences
+                    all_sentences.append((dataset_idx, subject, sent_idx))
+                    all_token_ids.append(set(non_padding_tokens))
 
-    valid_sentences = len(all_sentences)
-    print(f'[INFO] Total sentences: {total_sentences}')
-    print(f'[INFO] Valid sentences: {valid_sentences}')
-    print(f'[INFO] Filtered out: {filtered_sentences} ({100*filtered_sentences/total_sentences:.2f}%)')
+    if text_unique:
+        # Build sentence list from unique texts
+        all_sentences = list(text_to_instances.keys())
+        all_token_ids = [text_to_tokens[text] for text in all_sentences]
+        valid_sentences = sum(len(instances) for instances in text_to_instances.values())
+        unique_texts = len(all_sentences)
+        print(f'[INFO] Total sentences: {total_sentences}')
+        print(f'[INFO] Valid sentences: {valid_sentences}')
+        print(f'[INFO] Unique texts: {unique_texts}')
+        print(f'[INFO] Filtered out: {filtered_sentences} ({100*filtered_sentences/total_sentences:.2f}%)')
+    else:
+        valid_sentences = len(all_sentences)
+        print(f'[INFO] Total sentences: {total_sentences}')
+        print(f'[INFO] Valid sentences: {valid_sentences}')
+        print(f'[INFO] Filtered out: {filtered_sentences} ({100*filtered_sentences/total_sentences:.2f}%)')
 
     # Step 2: Build vocabulary of all unique tokens
     all_unique_tokens = set()
@@ -242,15 +269,15 @@ def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_rati
     token_to_idx = {token: idx for idx, token in enumerate(sorted(all_unique_tokens))}
     print(f'[INFO] Found {len(all_unique_tokens)} unique tokens')
 
-    # Step 3: Build binary matrix (n_sentences x n_tokens)
-    n_sentences = len(all_sentences)
+    # Step 3: Build binary matrix (n_items x n_tokens)
+    n_items = len(all_sentences)
     n_tokens = len(all_unique_tokens)
 
-    binary_matrix = np.zeros((n_sentences, n_tokens), dtype=np.int8)
+    binary_matrix = np.zeros((n_items, n_tokens), dtype=np.int8)
 
-    for sent_idx, token_set in enumerate(all_token_ids):
+    for item_idx, token_set in enumerate(all_token_ids):
         for token in token_set:
-            binary_matrix[sent_idx, token_to_idx[token]] = 1
+            binary_matrix[item_idx, token_to_idx[token]] = 1
 
     print(f'[INFO] Binary matrix shape: {binary_matrix.shape}')
     print(f'[INFO] Sparsity: {100 * (1 - binary_matrix.sum() / binary_matrix.size):.2f}%')
@@ -259,7 +286,7 @@ def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_rati
     # First split: train (80%) vs temp (20%)
     msss1 = MultilabelStratifiedShuffleSplit(n_splits=1, test_size=(dev_ratio + test_ratio),
                                               random_state=random_state)
-    train_indices, temp_indices = next(msss1.split(np.zeros(n_sentences), binary_matrix))
+    train_indices, temp_indices = next(msss1.split(np.zeros(n_items), binary_matrix))
 
     # Second split: dev (50% of temp) vs test (50% of temp)
     binary_matrix_temp = binary_matrix[temp_indices]
@@ -270,24 +297,62 @@ def create_stratified_split(input_dataset_dicts, tokenizer, subjects, train_rati
     dev_indices = temp_indices[dev_indices_temp]
     test_indices = temp_indices[test_indices_temp]
 
-    print(f'[INFO] Split sizes: train={len(train_indices)}, dev={len(dev_indices)}, test={len(test_indices)}')
+    if text_unique:
+        print(f'[INFO] Split unique texts: train={len(train_indices)}, dev={len(dev_indices)}, test={len(test_indices)}')
+    else:
+        print(f'[INFO] Split sizes: train={len(train_indices)}, dev={len(dev_indices)}, test={len(test_indices)}')
 
     # Step 5: Organize indices by (dataset_idx, subject)
     train_dict = defaultdict(lambda: defaultdict(list))
     dev_dict = defaultdict(lambda: defaultdict(list))
     test_dict = defaultdict(lambda: defaultdict(list))
 
-    for idx in train_indices:
-        dataset_idx, subject, sent_idx = all_sentences[idx]
-        train_dict[dataset_idx][subject].append(sent_idx)
+    if text_unique:
+        # Map texts back to all their instances
+        train_count = 0
+        dev_count = 0
+        test_count = 0
 
-    for idx in dev_indices:
-        dataset_idx, subject, sent_idx = all_sentences[idx]
-        dev_dict[dataset_idx][subject].append(sent_idx)
+        for idx in train_indices:
+            text = all_sentences[idx]
+            for dataset_idx, subject, sent_idx in text_to_instances[text]:
+                train_dict[dataset_idx][subject].append(sent_idx)
+                train_count += 1
 
-    for idx in test_indices:
-        dataset_idx, subject, sent_idx = all_sentences[idx]
-        test_dict[dataset_idx][subject].append(sent_idx)
+        for idx in dev_indices:
+            text = all_sentences[idx]
+            for dataset_idx, subject, sent_idx in text_to_instances[text]:
+                dev_dict[dataset_idx][subject].append(sent_idx)
+                dev_count += 1
+
+        for idx in test_indices:
+            text = all_sentences[idx]
+            for dataset_idx, subject, sent_idx in text_to_instances[text]:
+                test_dict[dataset_idx][subject].append(sent_idx)
+                test_count += 1
+
+        print(f'[INFO] Split instances: train={train_count}, dev={dev_count}, test={test_count}')
+
+        # Verify no text overlap
+        train_texts = set(all_sentences[idx] for idx in train_indices)
+        dev_texts = set(all_sentences[idx] for idx in dev_indices)
+        test_texts = set(all_sentences[idx] for idx in test_indices)
+        assert len(train_texts & dev_texts) == 0, "Text overlap between train and dev!"
+        assert len(train_texts & test_texts) == 0, "Text overlap between train and test!"
+        assert len(dev_texts & test_texts) == 0, "Text overlap between dev and test!"
+        print('[INFO] Verified: No text overlap between splits ✓')
+    else:
+        for idx in train_indices:
+            dataset_idx, subject, sent_idx = all_sentences[idx]
+            train_dict[dataset_idx][subject].append(sent_idx)
+
+        for idx in dev_indices:
+            dataset_idx, subject, sent_idx = all_sentences[idx]
+            dev_dict[dataset_idx][subject].append(sent_idx)
+
+        for idx in test_indices:
+            dataset_idx, subject, sent_idx = all_sentences[idx]
+            test_dict[dataset_idx][subject].append(sent_idx)
 
     return train_dict, dev_dict, test_dict
 
@@ -376,7 +441,7 @@ def analyze_token_distribution(input_dataset_dicts, tokenizer, subjects, train_i
 
 
 class ZuCo_dataset(Dataset):
-    def __init__(self, input_dataset_dicts, phase, tokenizer, subject = 'ALL', eeg_type = 'GD', bands = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2'], setting = 'unique_sent', is_add_CLS_token = False, test_input='noise', max_len = DEFAULT_MAX_LEN, use_stratified_split=True):
+    def __init__(self, input_dataset_dicts, phase, tokenizer, subject = 'ALL', eeg_type = 'GD', bands = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2'], setting = 'unique_sent', is_add_CLS_token = False, test_input='noise', max_len = DEFAULT_MAX_LEN, use_stratified_split=True, text_unique_split=False, loaded_split_indices=None):
         self.inputs = []
         self.tokenizer = tokenizer
 
@@ -397,11 +462,30 @@ class ZuCo_dataset(Dataset):
 
         # Perform stratified split if enabled and setting is 'unique_sent'
         phase_indices_dict = None
+        train_indices_dict = None
+        dev_indices_dict = None
+        test_indices_dict = None
+
         if use_stratified_split and setting == 'unique_sent':
-            print(f'[INFO] Using stratified split for {setting} setting')
-            train_indices_dict, dev_indices_dict, test_indices_dict = create_stratified_split(
-                input_dataset_dicts, tokenizer, subjects, max_len=max_len, random_state=42
-            )
+            if loaded_split_indices is not None:
+                # Use pre-computed indices from training
+                print(f'[INFO] Using loaded split indices for {setting} setting')
+                train_indices_dict = loaded_split_indices['train']
+                dev_indices_dict = loaded_split_indices['dev']
+                test_indices_dict = loaded_split_indices['test']
+            else:
+                # Create new split
+                print(f'[INFO] Creating new stratified split for {setting} setting')
+                train_indices_dict, dev_indices_dict, test_indices_dict = create_stratified_split(
+                    input_dataset_dicts, tokenizer, subjects, max_len=max_len, random_state=42, text_unique=text_unique_split
+                )
+
+            # Store all split indices for later saving (during training)
+            self.split_indices = {
+                'train': train_indices_dict,
+                'dev': dev_indices_dict,
+                'test': test_indices_dict
+            }
 
             # Select the appropriate indices based on phase
             if phase == 'train':
@@ -412,6 +496,8 @@ class ZuCo_dataset(Dataset):
                 phase_indices_dict = test_indices_dict
             else:
                 raise ValueError(f'Unknown phase: {phase}')
+        else:
+            self.split_indices = None
 
         for dataset_idx, input_dataset_dict in enumerate(input_dataset_dicts):
             if subject == 'ALL':

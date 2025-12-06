@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import wandb
 from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
 import pickle
@@ -100,6 +101,7 @@ def train_model(dataloaders, device, model, criterion, optimizer, scheduler, num
             epoch_loss = running_loss / dataset_sizes[phase]
 
             print('{} Loss: {:.4f}'.format(phase, epoch_loss))
+            wandb.log({f"{phase}/loss": epoch_loss})
 
             # deep copy the model
             if phase == 'dev' and epoch_loss < best_loss:
@@ -299,8 +301,9 @@ if __name__ == '__main__':
             pretrained = BartForConditionalGeneration(config)
         else:
             pretrained = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
-    
-        model = BrainTranslator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
+
+        dropout_rate = args['dropout_rate']
+        model = BrainTranslator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=dropout_rate)
     
     elif model_name == 'BrainTranslatorNaive':
         pretrained = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
@@ -420,7 +423,9 @@ if __name__ == '__main__':
     print('=== start Step2 training ... ===')
     # print training layers
     show_require_grad_layers(model)
-    
+
+    wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args)
+
     '''main loop'''
     trained_model = train_model(dataloaders, device, model, criterion, optimizer_step2, exp_lr_scheduler_step2, num_epochs=num_epochs_step2, checkpoint_path_best = output_checkpoint_name_best, checkpoint_path_last = output_checkpoint_name_last)
 

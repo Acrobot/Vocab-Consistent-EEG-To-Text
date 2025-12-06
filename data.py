@@ -419,6 +419,10 @@ class ZuCo_dataset(Dataset):
                 print('[INFO]using subjects: ', subjects)
             else:
                 subjects = [subject]
+
+            if subjects[0] not in input_dataset_dict:
+                print(f'[WARNING] subject {subjects[0]} not found in dataset {dataset_idx}, skipping...')
+                continue
             
             total_num_sentence = len(input_dataset_dict[subjects[0]])
             

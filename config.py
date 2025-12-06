@@ -31,6 +31,7 @@ def get_config(case):
         parser.add_argument('-ne2', '--num_epoch_step2', type = int, help='num_epoch_step2', default = 30, required=True)
         parser.add_argument('-lr1', '--learning_rate_step1', type = float, help='learning_rate_step1', default = 0.00005, required=True)
         parser.add_argument('-lr2', '--learning_rate_step2', type = float, help='learning_rate_step2', default = 0.0000005, required=True)
+        parser.add_argument('-drop', '--dropout_rate', type = float, help='dropout_rate', default = 0.1, required=True)
         parser.add_argument('-b', '--batch_size', type = int, help='batch_size', default = 32, required=True)
         
         parser.add_argument('-s', '--save_path', help='checkpoint save path', default = './checkpoints/decoding', required=True)

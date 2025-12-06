@@ -7,12 +7,12 @@ import numpy as np
 
 """ main architecture for open vocabulary EEG-To-Text decoding"""
 class BrainTranslator(nn.Module):
-    def __init__(self, pretrained_layers, in_feature = 840, decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048):
+    def __init__(self, pretrained_layers, in_feature = 840, decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=0.1):
         super(BrainTranslator, self).__init__()
         
         self.pretrained = pretrained_layers
         # additional transformer encoder, following BART paper about 
-        self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead,  dim_feedforward = additional_encoder_dim_feedforward, batch_first=True)
+        self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead,  dim_feedforward = additional_encoder_dim_feedforward, batch_first=True, dropout=dropout)
         self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=6)
         
         # print('[INFO]adding positional embedding')

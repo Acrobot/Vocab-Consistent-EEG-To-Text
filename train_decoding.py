@@ -440,7 +440,8 @@ if __name__ == '__main__':
     # print training layers
     show_require_grad_layers(model)
 
-    wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args)
+    wandb_run_name = f"Subj: {args['subjects']} | {model_name} | {task_name}"
+    wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args, name=wandb_run_name)
 
     '''main loop'''
     trained_model = train_model(dataloaders, device, model, criterion, optimizer_step2, exp_lr_scheduler_step2, num_epochs=num_epochs_step2, checkpoint_path_best = output_checkpoint_name_best, checkpoint_path_last = output_checkpoint_name_last)

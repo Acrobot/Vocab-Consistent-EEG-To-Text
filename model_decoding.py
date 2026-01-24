@@ -12,8 +12,9 @@ class BrainTranslator(nn.Module):
         
         self.pretrained = pretrained_layers
         # additional transformer encoder, following BART paper about 
+        self.positional_encoding = PositionalEncoding(in_feature, dropout=dropout)
         self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead,  dim_feedforward = additional_encoder_dim_feedforward, batch_first=True, dropout=dropout)
-        self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=6)
+        self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=3) # Reduced to 3 layers
         
         # print('[INFO]adding positional embedding')
         # self.positional_embedding = PositionalEncoding(in_feature)
@@ -25,12 +26,14 @@ class BrainTranslator(nn.Module):
         """input_mask: 1 is not masked, 0 is masked"""
         """input_masks_invert: 1 is masked, 0 is not masked"""
 
-        # input_embeddings_batch = self.positional_embedding(input_embeddings_batch)
+        # Add positional encoding
+        input_embeddings_batch = self.positional_encoding(input_embeddings_batch)
+
         # use src_key_padding_masks
         encoded_embedding = self.additional_encoder(input_embeddings_batch, src_key_padding_mask=input_masks_invert)
 
         # encoded_embedding = self.additional_encoder(input_embeddings_batch)
-        encoded_embedding = F.relu(self.fc1(encoded_embedding))
+        encoded_embedding = F.leaky_relu(self.fc1(encoded_embedding)) # Changed to LeakyReLU
         return encoded_embedding
 
     @torch.no_grad()
@@ -87,8 +90,9 @@ class T5Translator(nn.Module):
         self.tokenizer = T5Tokenizer.from_pretrained("t5-large")
         
         # additional transformer encoder, following BART paper about 
+        self.positional_encoding = PositionalEncoding(in_feature)
         self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead,  dim_feedforward = additional_encoder_dim_feedforward, batch_first=True)
-        self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=6)
+        self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=3) # Reduced to 3 layers
         
         # print('[INFO]adding positional embedding')
         # self.positional_embedding = PositionalEncoding(in_feature)
@@ -100,12 +104,14 @@ class T5Translator(nn.Module):
         """input_mask: 1 is not masked, 0 is masked"""
         """input_masks_invert: 1 is masked, 0 is not masked"""
 
-        # input_embeddings_batch = self.positional_embedding(input_embeddings_batch)
+        # Add positional encoding
+        input_embeddings_batch = self.positional_encoding(input_embeddings_batch)
+
         # use src_key_padding_masks
         encoded_embedding = self.additional_encoder(input_embeddings_batch, src_key_padding_mask=input_masks_invert)
 
         # encoded_embedding = self.additional_encoder(input_embeddings_batch)
-        encoded_embedding = F.relu(self.fc1(encoded_embedding))
+        encoded_embedding = F.leaky_relu(self.fc1(encoded_embedding)) # Changed to LeakyReLU
         return encoded_embedding
 
     @torch.no_grad()

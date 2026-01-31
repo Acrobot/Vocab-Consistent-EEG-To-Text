@@ -257,7 +257,7 @@ if __name__ == '__main__':
     if not os.path.exists(cfg_dir):
         os.makedirs(cfg_dir)
 
-    if model_name in ['BrainTranslator','BrainTranslatorNaive']:
+    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'BrainTranslatorBaseline']:
         tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
 
     elif model_name == 'PegasusTranslator':

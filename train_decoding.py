@@ -15,7 +15,7 @@ import copy
 from tqdm import tqdm
 from transformers import BertLMHeadModel, BartTokenizer, BartForConditionalGeneration, BartConfig, BartForSequenceClassification, BertTokenizer, BertConfig, BertForSequenceClassification, RobertaTokenizer, RobertaForSequenceClassification, PegasusForConditionalGeneration, PegasusTokenizer, T5Tokenizer, T5ForConditionalGeneration, BertGenerationEncoder, BertGenerationDecoder, EncoderDecoderConfig, EncoderDecoderModel, get_cosine_schedule_with_warmup
 from data import ZuCo_dataset
-from model_decoding import BrainTranslator, BrainTranslatorNaive, T5Translator
+from model_decoding import BrainTranslator, BrainTranslatorNaive, BrainTranslatorBaseline, T5Translator
 from config import get_config
 
 def train_model(dataloaders, device, model, criterion, optimizer, scheduler, num_epochs=25, checkpoint_path_best = './checkpoints/decoding/best/temp_decoding.pt', checkpoint_path_last = './checkpoints/decoding/last/temp_decoding.pt'):
@@ -321,6 +321,17 @@ if __name__ == '__main__':
         dropout_rate = args['dropout_rate']
         model = BrainTranslator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=dropout_rate)
     
+
+    elif model_name == 'BrainTranslatorBaseline':
+        if use_random_init:
+            config = BartConfig.from_pretrained('facebook/bart-large')
+            pretrained = BartForConditionalGeneration(config)
+        else:
+            pretrained = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
+
+        dropout_rate = args['dropout_rate']
+        model = BrainTranslatorBaseline(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=dropout_rate)
+
     elif model_name == 'BrainTranslatorNaive':
         pretrained = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
         model = BrainTranslatorNaive(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)

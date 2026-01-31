@@ -18,7 +18,7 @@ import torch.nn.functional as F
 import time
 from transformers import BertLMHeadModel, BartTokenizer, BartForConditionalGeneration, BartConfig, BartForSequenceClassification, BertTokenizer, BertConfig, BertForSequenceClassification, RobertaTokenizer, RobertaForSequenceClassification, PegasusForConditionalGeneration, PegasusTokenizer, T5Tokenizer, T5ForConditionalGeneration, BertGenerationDecoder
 from data import ZuCo_dataset
-from model_decoding import BrainTranslator, BrainTranslatorNaive, T5Translator
+from model_decoding import BrainTranslator, BrainTranslatorNaive, BrainTranslatorBaseline, T5Translator
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 from rouge import Rouge
 from config import get_config
@@ -309,7 +309,7 @@ if __name__ == '__main__':
             whole_dataset_dicts.append(pickle.load(handle))
     print()
     
-    if model_name in ['BrainTranslator','BrainTranslatorNaive']:
+    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'BrainTranslatorBaseline']:
         tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
 
     elif model_name == 'PegasusTranslator':
@@ -352,7 +352,11 @@ if __name__ == '__main__':
     if model_name == 'BrainTranslator':
         pretrained_bart = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
         model = BrainTranslator(pretrained_bart, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
-    
+
+    elif model_name == 'BrainTranslatorBaseline':
+        pretrained_bart = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
+        model = BrainTranslatorBaseline(pretrained_bart, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
+
     elif model_name == 'BrainTranslatorNaive':
         pretrained_bart = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
         model = BrainTranslatorNaive(pretrained_bart, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)

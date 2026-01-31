@@ -442,8 +442,13 @@ def analyze_token_distribution(input_dataset_dicts, tokenizer, subjects, train_i
 
 class ZuCo_dataset(Dataset):
     def __init__(self, input_dataset_dicts, phase, tokenizer, subject = 'ALL', eeg_type = 'GD', bands = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2'], setting = 'unique_sent', is_add_CLS_token = False, test_input='noise', max_len = DEFAULT_MAX_LEN, use_stratified_split=True, text_unique_split=False, loaded_split_indices=None):
-        self.inputs = []
+        self.inputs = [] # This will now store metadata for lazy loading
         self.tokenizer = tokenizer
+        self.eeg_type = eeg_type
+        self.bands = bands
+        self.is_add_CLS_token = is_add_CLS_token
+        self.test_input = test_input
+        self.max_len = max_len
 
         if not isinstance(input_dataset_dicts,list):
             input_dataset_dicts = [input_dataset_dicts]
@@ -517,7 +522,6 @@ class ZuCo_dataset(Dataset):
             
             print(f'train divider = {train_divider}')
             print(f'dev divider = {dev_divider}')
-
             if setting == 'unique_sent':
                 if phase_indices_dict is not None:
                     # Use stratified split
@@ -526,32 +530,42 @@ class ZuCo_dataset(Dataset):
                         if dataset_idx in phase_indices_dict and key in phase_indices_dict[dataset_idx]:
                             indices = phase_indices_dict[dataset_idx][key]
                             for i in indices:
-                                input_sample = get_input_sample(input_dataset_dict[key][i],self.tokenizer,eeg_type,bands = bands, add_CLS_token = is_add_CLS_token, test_input=test_input, max_len=max_len)
-                                if input_sample is not None:
-                                    self.inputs.append(input_sample)
+                                # Validate sample by calling get_input_sample, but only store the reference
+                                sent_obj = input_dataset_dict[key][i]
+                                if sent_obj is not None:
+                                    test_sample = get_input_sample(sent_obj, self.tokenizer, eeg_type, bands=bands, add_CLS_token=is_add_CLS_token, test_input=test_input, max_len=max_len)
+                                    if test_sample is not None:
+                                        self.inputs.append({'sent_obj': sent_obj})
                 else:
                     # Use sequential split (old method)
                     if phase == 'train':
                         print('[INFO]initializing a train set...')
                         for key in subjects:
                             for i in range(train_divider):
-                                input_sample = get_input_sample(input_dataset_dict[key][i],self.tokenizer,eeg_type,bands = bands, add_CLS_token = is_add_CLS_token, test_input=test_input, max_len=max_len)
-                                if input_sample is not None:
-                                    self.inputs.append(input_sample)
+                                sent_obj = input_dataset_dict[key][i]
+                                if sent_obj is not None:
+                                    test_sample = get_input_sample(sent_obj, self.tokenizer, eeg_type, bands=bands, add_CLS_token=is_add_CLS_token, test_input=test_input, max_len=max_len)
+                                    if test_sample is not None:
+                                        self.inputs.append({'sent_obj': sent_obj})
                     elif phase == 'dev':
                         print('[INFO]initializing a dev set...')
                         for key in subjects:
                             for i in range(train_divider,dev_divider):
-                                input_sample = get_input_sample(input_dataset_dict[key][i],self.tokenizer,eeg_type,bands = bands, add_CLS_token = is_add_CLS_token, test_input=test_input, max_len=max_len)
-                                if input_sample is not None:
-                                    self.inputs.append(input_sample)
+                                sent_obj = input_dataset_dict[key][i]
+                                if sent_obj is not None:
+                                    test_sample = get_input_sample(sent_obj, self.tokenizer, eeg_type, bands=bands, add_CLS_token=is_add_CLS_token, test_input=test_input, max_len=max_len)
+                                    if test_sample is not None:
+                                        self.inputs.append({'sent_obj': sent_obj})
                     elif phase == 'test':
                         print('[INFO]initializing a test set...')
                         for key in subjects:
                             for i in range(dev_divider,total_num_sentence):
-                                input_sample = get_input_sample(input_dataset_dict[key][i],self.tokenizer,eeg_type,bands = bands, add_CLS_token = is_add_CLS_token, test_input=test_input, max_len=max_len)
-                                if input_sample is not None:
-                                    self.inputs.append(input_sample)
+                                sent_obj = input_dataset_dict[key][i]
+                                if sent_obj is not None:
+                                    test_sample = get_input_sample(sent_obj, self.tokenizer, eeg_type, bands=bands, add_CLS_token=is_add_CLS_token, test_input=test_input, max_len=max_len)
+                                    if test_sample is not None:
+                                        self.inputs.append({'sent_obj': sent_obj})
+
             elif setting == 'unique_subj':
                 print('WARNING!!! only implemented for SR v1 dataset ')
                 # subject ['ZAB', 'ZDM', 'ZGW', 'ZJM', 'ZJN', 'ZJS', 'ZKB', 'ZKH', 'ZKW'] for train
@@ -561,33 +575,52 @@ class ZuCo_dataset(Dataset):
                     print(f'[INFO]initializing a train set using {setting} setting...')
                     for i in range(total_num_sentence):
                         for key in ['ZAB', 'ZDM', 'ZGW', 'ZJM', 'ZJN', 'ZJS', 'ZKB', 'ZKH','ZKW']:
-                            input_sample = get_input_sample(input_dataset_dict[key][i],self.tokenizer,eeg_type,bands = bands, add_CLS_token = is_add_CLS_token)
-                            if input_sample is not None:
-                                self.inputs.append(input_sample)
+                            sent_obj = input_dataset_dict[key][i]
+                            if sent_obj is not None:
+                                test_sample = get_input_sample(sent_obj, self.tokenizer, eeg_type, bands=bands, add_CLS_token=is_add_CLS_token)
+                                if test_sample is not None:
+                                    self.inputs.append({'sent_obj': sent_obj})
                 if phase == 'dev':
                     print(f'[INFO]initializing a dev set using {setting} setting...')
                     for i in range(total_num_sentence):
                         for key in ['ZMG']:
-                            input_sample = get_input_sample(input_dataset_dict[key][i],self.tokenizer,eeg_type,bands = bands, add_CLS_token = is_add_CLS_token)
-                            if input_sample is not None:
-                                self.inputs.append(input_sample)
+                            sent_obj = input_dataset_dict[key][i]
+                            if sent_obj is not None:
+                                test_sample = get_input_sample(sent_obj, self.tokenizer, eeg_type, bands=bands, add_CLS_token=is_add_CLS_token)
+                                if test_sample is not None:
+                                    self.inputs.append({'sent_obj': sent_obj})
                 if phase == 'test':
                     print(f'[INFO]initializing a test set using {setting} setting...')
                     for i in range(total_num_sentence):
                         for key in ['ZPH']:
-                            input_sample = get_input_sample(input_dataset_dict[key][i],self.tokenizer,eeg_type,bands = bands, add_CLS_token = is_add_CLS_token)
-                            if input_sample is not None:
-                                self.inputs.append(input_sample)
+                            sent_obj = input_dataset_dict[key][i]
+                            if sent_obj is not None:
+                                test_sample = get_input_sample(sent_obj, self.tokenizer, eeg_type, bands=bands, add_CLS_token=is_add_CLS_token)
+                                if test_sample is not None:
+                                    self.inputs.append({'sent_obj': sent_obj})
+
             print('++ adding task to dataset, now we have:', len(self.inputs))
 
-        print('[INFO]input tensor size:', self.inputs[0]['input_embeddings'].size())
+        print(f'[INFO] Lazy loading enabled. Stored {len(self.inputs)} sample references.')
         print()
 
     def __len__(self):
         return len(self.inputs)
 
     def __getitem__(self, idx):
-        input_sample = self.inputs[idx]
+        # Lazy loading: process the sample only when requested
+        # All samples in self.inputs are pre-validated during __init__
+        metadata = self.inputs[idx]
+        input_sample = get_input_sample(
+            metadata['sent_obj'], 
+            self.tokenizer, 
+            eeg_type=self.eeg_type, 
+            bands=self.bands, 
+            add_CLS_token=self.is_add_CLS_token, 
+            test_input=self.test_input, 
+            max_len=self.max_len
+        )
+        
         return (
             input_sample['input_embeddings'], 
             input_sample['seq_len'],
@@ -599,6 +632,7 @@ class ZuCo_dataset(Dataset):
             #input_sample['sent_level_EEG']
         )
         # keys: input_embeddings, input_attn_mask, input_attn_mask_invert, target_ids, target_mask, 
+
 
 
 """for train classifier on stanford sentiment treebank text-sentiment pairs"""

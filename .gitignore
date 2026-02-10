@@ -170,3 +170,5 @@ dataset
 results/
 score_results/
 wandb/
+checkpoints/
+debug_scripts/

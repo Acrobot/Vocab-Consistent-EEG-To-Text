@@ -15,13 +15,13 @@ import copy
 from tqdm import tqdm
 from transformers import BertLMHeadModel, BartTokenizer, BartForConditionalGeneration, BartConfig, BartForSequenceClassification, BertTokenizer, BertConfig, BertForSequenceClassification, RobertaTokenizer, RobertaForSequenceClassification, PegasusForConditionalGeneration, PegasusTokenizer, T5Tokenizer, T5ForConditionalGeneration, BertGenerationEncoder, BertGenerationDecoder, EncoderDecoderConfig, EncoderDecoderModel, get_cosine_schedule_with_warmup
 from data import ZuCo_dataset
-from model_decoding import BrainTranslator, BrainTranslatorNaive, BrainTranslatorBaseline, T5Translator
+from model_decoding import BrainTranslator, BrainTranslatorNaive, BrainTranslatorBaseline, BrainTranslatorV2, T5Translator
 from config import get_config
 
 def train_model(dataloaders, device, model, criterion, optimizer, scheduler, num_epochs=25, checkpoint_path_best = './checkpoints/decoding/best/temp_decoding.pt', checkpoint_path_last = './checkpoints/decoding/last/temp_decoding.pt'):
     # modified from: https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
     since = time.time()
-      
+
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 100000000000
 
@@ -40,7 +40,7 @@ def train_model(dataloaders, device, model, criterion, optimizer, scheduler, num
 
             # Iterate over data.
             for input_embeddings, seq_len, input_masks, input_mask_invert, target_ids, target_mask, sentiment_labels in tqdm(dataloaders[phase]):
-                
+
                 # load in batch
                 input_embeddings_batch = input_embeddings.to(device).float()
                 input_masks_batch = input_masks.to(device)
@@ -80,7 +80,7 @@ def train_model(dataloaders, device, model, criterion, optimizer, scheduler, num
                     #     # print('target mask:', target_mask_batch[idx])
                     #     # print('[DEBUG]target tokens:',tokenizer.decode(target_ids_batch_copy[idx]))
                     #     print('[DEBUG]predicted tokens:',tokenizer.decode(predictions))
-                
+
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         # with torch.autograd.detect_anomaly():
@@ -93,7 +93,7 @@ def train_model(dataloaders, device, model, criterion, optimizer, scheduler, num
                 running_loss += loss.sum().item() * input_embeddings_batch.size()[0] # batch loss
                 # print('[DEBUG]loss:',loss.item())
                 # print('#################################')
-                
+
 
             if phase == 'train':
                 scheduler.step()
@@ -135,30 +135,144 @@ def show_require_grad_layers(model):
         if param.requires_grad:
             print(' ', name)
 
+def train_model_contrastive(dataloaders, device, model, criterion, optimizer, scheduler, num_epochs=25,
+                             checkpoint_path_best='./checkpoints/decoding/best/temp_decoding.pt',
+                             checkpoint_path_last='./checkpoints/decoding/last/temp_decoding.pt',
+                             contrastive_lambda=0.3):
+    """Training with noise-contrastive auxiliary loss.
+
+    For each batch, runs both real EEG and random noise through the encoder,
+    then adds a contrastive loss that pushes their representations apart.
+    This forces the encoder to produce EEG-specific representations.
+    """
+    import torch.nn.functional as F
+    since = time.time()
+
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_loss = 100000000000
+
+    for epoch in range(num_epochs):
+        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+        print('-' * 10)
+
+        for phase in ['train', 'dev']:
+            if phase == 'train':
+                model.train()
+            else:
+                model.eval()
+
+            running_loss = 0.0
+            running_lm_loss = 0.0
+            running_contrastive_loss = 0.0
+
+            for input_embeddings, seq_len, input_masks, input_mask_invert, target_ids, target_mask, sentiment_labels in tqdm(dataloaders[phase]):
+                input_embeddings_batch = input_embeddings.to(device).float()
+                input_masks_batch = input_masks.to(device)
+                input_mask_invert_batch = input_mask_invert.to(device)
+                target_ids_batch = target_ids.to(device)
+                target_ids_batch[target_ids_batch == tokenizer.pad_token_id] = -100
+
+                optimizer.zero_grad()
+
+                with torch.set_grad_enabled(phase == 'train'):
+                    # Standard forward pass with EEG input
+                    seq2seqLMoutput = model(input_embeddings_batch, input_masks_batch, input_mask_invert_batch, target_ids_batch)
+                    lm_loss = seq2seqLMoutput.loss
+
+                    # Noise-contrastive auxiliary loss
+                    if contrastive_lambda > 0:
+                        # Get encoder output for real EEG (detached to prevent gradient interference)
+                        if hasattr(model, 'module'):
+                            eeg_encoded = model.module.addin_forward(input_embeddings_batch, input_mask_invert_batch).detach()
+                        else:
+                            eeg_encoded = model.addin_forward(input_embeddings_batch, input_mask_invert_batch).detach()
+
+                        # Generate noise and get encoder output
+                        noise_input = torch.randn_like(input_embeddings_batch)
+                        if hasattr(model, 'module'):
+                            noise_encoded = model.module.addin_forward(noise_input, input_mask_invert_batch)
+                        else:
+                            noise_encoded = model.addin_forward(noise_input, input_mask_invert_batch)
+
+                        # Pool across sequence dimension (only non-masked positions)
+                        # Use input_masks_batch (1=real, 0=pad) to mask pooling
+                        mask_for_pool = input_masks_batch[:, :eeg_encoded.shape[1]].unsqueeze(-1).float()
+                        eeg_pooled = (eeg_encoded * mask_for_pool).sum(dim=1) / mask_for_pool.sum(dim=1).clamp(min=1)
+                        noise_pooled = (noise_encoded * mask_for_pool).sum(dim=1) / mask_for_pool.sum(dim=1).clamp(min=1)
+
+                        # Cosine similarity: we want this to be -1 (maximally different)
+                        cosine_sim = F.cosine_similarity(eeg_pooled, noise_pooled, dim=1)
+                        contrastive_loss = cosine_sim.mean()  # Minimize positive similarity
+
+                        loss = lm_loss + contrastive_lambda * contrastive_loss
+                    else:
+                        loss = lm_loss
+                        contrastive_loss = torch.tensor(0.0)
+
+                    if phase == 'train':
+                        loss.sum().backward()
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                        optimizer.step()
+
+                running_loss += loss.sum().item() * input_embeddings_batch.size()[0]
+                running_lm_loss += lm_loss.sum().item() * input_embeddings_batch.size()[0]
+                running_contrastive_loss += contrastive_loss.item() * input_embeddings_batch.size()[0]
+
+            if phase == 'train':
+                scheduler.step()
+
+            epoch_loss = running_loss / dataset_sizes[phase]
+            epoch_lm_loss = running_lm_loss / dataset_sizes[phase]
+            epoch_contrastive_loss = running_contrastive_loss / dataset_sizes[phase]
+
+            print('{} Loss: {:.4f} (LM: {:.4f}, Contrastive: {:.4f})'.format(
+                phase, epoch_loss, epoch_lm_loss, epoch_contrastive_loss))
+            wandb.log({
+                f"{phase}/loss": epoch_loss,
+                f"{phase}/lm_loss": epoch_lm_loss,
+                f"{phase}/contrastive_loss": epoch_contrastive_loss,
+            })
+
+            if phase == 'dev' and epoch_lm_loss < best_loss:
+                best_loss = epoch_loss
+                best_model_wts = copy.deepcopy(model.state_dict())
+                torch.save(model.state_dict(), checkpoint_path_best)
+                print(f'update best on dev checkpoint: {checkpoint_path_best}')
+        print()
+
+    time_elapsed = time.time() - since
+    print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+    print('Best val loss: {:4f}'.format(best_loss))
+    torch.save(model.state_dict(), checkpoint_path_last)
+    print(f'update last checkpoint: {checkpoint_path_last}')
+
+    model.load_state_dict(best_model_wts)
+    return model
+
 if __name__ == '__main__':
     args = get_config('train_decoding')
 
     ''' config param'''
     dataset_setting = 'unique_sent'
-    
+
     num_epochs_step1 = args['num_epoch_step1']
     num_epochs_step2 = args['num_epoch_step2']
     step1_lr = args['learning_rate_step1']
     step2_lr = args['learning_rate_step2']
-    
+
     batch_size = args['batch_size']
-    
+
     model_name = args['model_name']
     # model_name = 'BrainTranslatorNaive' # with no additional transformers
-    # model_name = 'BrainTranslator' 
-    
+    # model_name = 'BrainTranslator'
+
     # task_name = 'task1'
     # task_name = 'task1_task2'
     # task_name = 'task1_task2_task3'
     # task_name = 'task1_task2_taskNRv2'
     task_name = args['task_name']
     train_input = args['train_input']
-    print("train_input is:", train_input)   
+    print("train_input is:", train_input)
     save_path = args['save_path']
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -170,14 +284,14 @@ if __name__ == '__main__':
 
     if use_random_init and skip_step_one:
         step2_lr = 5*1e-4
-        
+
     print(f'[INFO]using model: {model_name}')
-    
+
     if skip_step_one:
         save_name = f'{task_name}_finetune_{model_name}_skipstep1_b{batch_size}_{num_epochs_step1}_{num_epochs_step2}_{step1_lr}_{step2_lr}_{dataset_setting}_{train_input}'
     else:
         save_name = f'{task_name}_finetune_{model_name}_2steptraining_b{batch_size}_{num_epochs_step1}_{num_epochs_step2}_{step1_lr}_{step2_lr}_{dataset_setting}_{train_input}'
-    
+
     if use_random_init:
         save_name = 'randinit_' + save_name
 
@@ -199,13 +313,13 @@ if __name__ == '__main__':
     # eeg_type_choice = 'GD
     eeg_type_choice = args['eeg_type']
     print(f'[INFO]eeg type {eeg_type_choice}')
-    # bands_choice = ['_t1'] 
-    # bands_choice = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2'] 
+    # bands_choice = ['_t1']
+    # bands_choice = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2']
     bands_choice = args['eeg_bands']
     print(f'[INFO]using bands {bands_choice}')
 
 
-    
+
     ''' set random seeds '''
     seed_val = 312
     np.random.seed(seed_val)
@@ -220,12 +334,12 @@ if __name__ == '__main__':
 
     ''' set up device '''
     # use cuda
-    if torch.cuda.is_available():  
-        # dev = "cuda:3" 
-        dev = args['cuda'] 
-    else:  
+    if torch.cuda.is_available():
+        # dev = "cuda:3"
+        dev = args['cuda']
+    else:
         dev = "cpu"
-    # CUDA_VISIBLE_DEVICES=0,1,2,3  
+    # CUDA_VISIBLE_DEVICES=0,1,2,3
     device = torch.device(dev)
     print(f'[INFO]using device {dev}')
     print()
@@ -257,12 +371,12 @@ if __name__ == '__main__':
     if not os.path.exists(cfg_dir):
         os.makedirs(cfg_dir)
 
-    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'BrainTranslatorBaseline']:
+    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'BrainTranslatorBaseline', 'BrainTranslatorV2']:
         tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
 
     elif model_name == 'PegasusTranslator':
         tokenizer = PegasusTokenizer.from_pretrained('google/pegasus-xsum')
-    
+
     elif model_name == 'T5Translator':
         tokenizer = T5Tokenizer.from_pretrained("t5-large")
         #tokenizer.set_prefix_tokens(language='english')
@@ -298,7 +412,7 @@ if __name__ == '__main__':
     print('[INFO]train_set size: ', len(train_set))
     print('[INFO]dev_set size: ', len(dev_set))
     # print('[INFO]test_set size: ', len(test_set))
-    
+
     # Create generator for reproducible shuffling
     generator = torch.Generator()
     generator.manual_seed(seed_val)
@@ -320,7 +434,7 @@ if __name__ == '__main__':
 
         dropout_rate = args['dropout_rate']
         model = BrainTranslator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=dropout_rate)
-    
+
 
     elif model_name == 'BrainTranslatorBaseline':
         if use_random_init:
@@ -332,6 +446,16 @@ if __name__ == '__main__':
         dropout_rate = args['dropout_rate']
         model = BrainTranslatorBaseline(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=dropout_rate)
 
+    elif model_name == 'BrainTranslatorV2':
+        if use_random_init:
+            config = BartConfig.from_pretrained('facebook/bart-large')
+            pretrained = BartForConditionalGeneration(config)
+        else:
+            pretrained = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
+
+        dropout_rate = args['dropout_rate']
+        model = BrainTranslatorV2(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=dropout_rate)
+
     elif model_name == 'BrainTranslatorNaive':
         pretrained = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
         model = BrainTranslatorNaive(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
@@ -339,14 +463,14 @@ if __name__ == '__main__':
     elif model_name == 'PegasusTranslator':
         pretrained = PegasusForConditionalGeneration.from_pretrained('google/pegasus-xsum')
         model = BrainTranslator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
-    
+
     elif model_name == 'T5Translator':
         pretrained = T5ForConditionalGeneration.from_pretrained("t5-large")
         model = T5Translator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
-    
+
     model.to(device)
     model = torch.nn.DataParallel(model, device_ids=device_ids)
-    
+
     ''' training loop '''
 
     ######################################################
@@ -354,7 +478,7 @@ if __name__ == '__main__':
     ######################################################
 
     # closely follow BART paper
-    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'PegasusTranslator', 'T5Translator']:
+    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'BrainTranslatorBaseline', 'BrainTranslatorV2', 'PegasusTranslator', 'T5Translator']:
         for name, param in model.named_parameters():
             if param.requires_grad and 'pretrained' in name:
                 if ('shared' in name) or ('embed_positions' in name) or ('encoder.layers.0' in name):
@@ -369,7 +493,7 @@ if __name__ == '__main__':
                     continue
                 else:
                     param.requires_grad = False
- 
+
 
     if skip_step_one:
         if load_step1_checkpoint:
@@ -410,6 +534,12 @@ if __name__ == '__main__':
         print('=== start Step1 training ... ===')
         # print training layers
         show_require_grad_layers(model)
+
+        if not wandb.run:
+            wandb_run_name = f"Subj: {args['subjects']} | {model_name} | {task_name}"
+            wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args, name=wandb_run_name,
+                       settings=wandb.Settings(init_timeout=300))
+
         # return best loss model from step1 training
         model = train_model(dataloaders, device, model, criterion, optimizer_step1, exp_lr_scheduler_step1, num_epochs=num_epochs_step1, checkpoint_path_best = output_checkpoint_name_best, checkpoint_path_last = output_checkpoint_name_last)
 
@@ -445,17 +575,27 @@ if __name__ == '__main__':
 
     ''' set up loss function '''
     criterion = nn.CrossEntropyLoss()
-    
+
     print()
     print('=== start Step2 training ... ===')
     # print training layers
     show_require_grad_layers(model)
 
-    wandb_run_name = f"Subj: {args['subjects']} | {model_name} | {task_name}"
-    wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args, name=wandb_run_name)
+    # Initialize wandb only if not already initialized (step1 may have done it)
+    if not wandb.run:
+        wandb_run_name = f"Subj: {args['subjects']} | {model_name} | {task_name}"
+        wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args, name=wandb_run_name,
+                   settings=wandb.Settings(init_timeout=300))
 
     '''main loop'''
-    trained_model = train_model(dataloaders, device, model, criterion, optimizer_step2, exp_lr_scheduler_step2, num_epochs=num_epochs_step2, checkpoint_path_best = output_checkpoint_name_best, checkpoint_path_last = output_checkpoint_name_last)
+    contrastive_lambda = args.get('contrastive_lambda', 0.0)
+    if contrastive_lambda > 0:
+        print(f'[INFO] Using noise-contrastive training with lambda={contrastive_lambda}')
+        trained_model = train_model_contrastive(dataloaders, device, model, criterion, optimizer_step2, exp_lr_scheduler_step2,
+                                                 num_epochs=num_epochs_step2, checkpoint_path_best=output_checkpoint_name_best,
+                                                 checkpoint_path_last=output_checkpoint_name_last, contrastive_lambda=contrastive_lambda)
+    else:
+        trained_model = train_model(dataloaders, device, model, criterion, optimizer_step2, exp_lr_scheduler_step2, num_epochs=num_epochs_step2, checkpoint_path_best = output_checkpoint_name_best, checkpoint_path_last = output_checkpoint_name_last)
 
     # '''save checkpoint'''
     # torch.save(trained_model.state_dict(), os.path.join(save_path,output_checkpoint_name))

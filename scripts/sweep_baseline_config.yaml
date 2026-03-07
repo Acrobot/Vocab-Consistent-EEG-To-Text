@@ -1,0 +1,22 @@
+command:
+  - python
+  - ${program}
+  - ${args_no_hyphens}
+program: scripts/sweep_train_baseline.py
+method: bayes
+metric:
+  name: dev/loss
+  goal: minimize
+parameters:
+  contrastive_lambda:
+    distribution: uniform
+    min: 0.01
+    max: 0.50
+  dropout_rate:
+    distribution: uniform
+    min: 0.20
+    max: 0.50
+  learning_rate_step2:
+    distribution: log_uniform_values
+    min: 0.00005
+    max: 0.0005

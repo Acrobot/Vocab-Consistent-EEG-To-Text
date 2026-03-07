@@ -11,19 +11,19 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def get_config(case):
-    if case == 'train_decoding': 
+    if case == 'train_decoding':
         # args config for training EEG-To-Text decoder
         parser = argparse.ArgumentParser(description='Specify config args for training EEG-To-Text decoder')
-        
+
         parser.add_argument('-m', '--model_name', help='choose from {BrainTranslator, BrainTranslatorNaive, BrainTranslatorBaseline}', default = "BrainTranslator" ,required=True)
         parser.add_argument('-t', '--task_name', help='choose from {task1,task1_task2, task1_task2_task3,task1_task2_taskNRv2}', default = "task1", required=True)
-        
+
         parser.add_argument('-1step', '--one_step', dest='skip_step_one', action='store_true')
         parser.add_argument('-2step', '--two_step', dest='skip_step_one', action='store_false')
 
         parser.add_argument('-pre', '--pretrained', dest='use_random_init', action='store_false')
         parser.add_argument('-rand', '--rand_init', dest='use_random_init', action='store_true')
-        
+
         parser.add_argument('-load1', '--load_step1_checkpoint', dest='load_step1_checkpoint', action='store_true')
         parser.add_argument('-no-load1', '--not_load_step1_checkpoint', dest='load_step1_checkpoint', action='store_false')
 
@@ -33,21 +33,22 @@ def get_config(case):
         parser.add_argument('-lr2', '--learning_rate_step2', type = float, help='learning_rate_step2', default = 0.0000005, required=True)
         parser.add_argument('-drop', '--dropout_rate', type = float, help='dropout_rate', default = 0.1, required=True)
         parser.add_argument('-b', '--batch_size', type = int, help='batch_size', default = 32, required=True)
-        
+
         parser.add_argument('-s', '--save_path', help='checkpoint save path', default = './checkpoints/decoding', required=True)
         parser.add_argument('-subj', '--subjects', help='use all subjects or specify a particular one', default = 'ALL', required=False)
         parser.add_argument('-eeg', '--eeg_type', help='choose from {GD, FFD, TRT}', default = 'GD', required=False)
         parser.add_argument('-band', '--eeg_bands', nargs='+', help='specify freqency bands', default = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2'] , required=False)
         parser.add_argument('-cuda', '--cuda', help='specify cuda device name, e.g. cuda:0, cuda:1, etc', default = 'cuda:0')
-        
+
         parser.add_argument('-train_input', '--train_input', help='add noise' ,required=True)
         parser.add_argument('-text_unique', '--text_unique_split', dest='text_unique_split', action='store_true', help='ensure same text never appears in both train and test, even across subjects')
+        parser.add_argument('-cl', '--contrastive_lambda', type=float, help='weight for noise-contrastive auxiliary loss (0 = disabled)', default=0.0, required=False)
         args = vars(parser.parse_args())
 
     elif case == 'train_sentiment_baseline':
         # args config for training EEG-based sentiment baselines
         parser = argparse.ArgumentParser(description='Specify config args for training EEG-To-Text decoder')
-        
+
         parser.add_argument('-m', '--model_name', help='choose from {BaselineMLP, BaselineLSTM, NaiveFinetuneBert}', default = "NaiveFinetuneBert" ,required=True)
         parser.add_argument('-ne', '--num_epoch', type = int, help='num_epoch', default = 30, required=True)
         parser.add_argument('-lr', '--learning_rate', type = float, help='learning_rate', default = 0.00001, required=True)
@@ -58,8 +59,8 @@ def get_config(case):
         parser.add_argument('-band', '--eeg_bands', nargs='+', help='specify freqency bands', default = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2'] , required=False)
         parser.add_argument('-cuda', '--cuda', help='specify cuda device name, e.g. cuda:0, cuda:1, etc', default = 'cuda:0')
         args = vars(parser.parse_args())
-        
-    elif case == 'train_sentiment_textbased': 
+
+    elif case == 'train_sentiment_textbased':
         # args config for training text-based sentiment classification models
         parser = argparse.ArgumentParser(description='Specify config args for training text-based sentiment classifiers')
         parser.add_argument('-d', '--dataset_name', help='zero-shot setting: using external dataset from stanford sentiment treebank, pass in SST; to use ZuCo\'s own text-sentiment pairs, pass in ZuCo', default = "SST" ,required=True)
@@ -73,7 +74,7 @@ def get_config(case):
         parser.add_argument('-band', '--eeg_bands', nargs='+', help='specify freqency bands', default = ['_t1','_t2','_a1','_a2','_b1','_b2','_g1','_g2'] , required=False)
         parser.add_argument('-cuda', '--cuda', help='specify cuda device name, e.g. cuda:0, cuda:1, etc', default = 'cuda:0')
         args = vars(parser.parse_args())
-        
+
     elif case == 'eval_decoding':
         # args config for evaluating EEG-To-Text decoder
         parser = argparse.ArgumentParser(description='Specify config args for evaluate EEG-To-Text decoder')
@@ -83,7 +84,7 @@ def get_config(case):
         parser.add_argument('-train_input', '--train_input', help='add noise' ,required=True)
         parser.add_argument('-cuda', '--cuda', help='specify cuda device name, e.g. cuda:0, cuda:1, etc', default = 'cuda:0')
         args = vars(parser.parse_args())
-        
+
     elif case == 'eval_sentiment':
         # args config for sentiment classification models
         parser = argparse.ArgumentParser(description='Specify config args for evaluate EEG-based sentiment classification, including Zero-shot pipeline')

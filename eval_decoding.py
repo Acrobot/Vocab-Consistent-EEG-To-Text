@@ -18,7 +18,7 @@ import torch.nn.functional as F
 import time
 from transformers import BertLMHeadModel, BartTokenizer, BartForConditionalGeneration, BartConfig, BartForSequenceClassification, BertTokenizer, BertConfig, BertForSequenceClassification, RobertaTokenizer, RobertaForSequenceClassification, PegasusForConditionalGeneration, PegasusTokenizer, T5Tokenizer, T5ForConditionalGeneration, BertGenerationDecoder
 from data import ZuCo_dataset
-from model_decoding import BrainTranslator, BrainTranslatorNaive, BrainTranslatorBaseline, T5Translator
+from model_decoding import BrainTranslator, BrainTranslatorNaive, BrainTranslatorBaseline, BrainTranslatorV2, T5Translator
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 from rouge import Rouge
 from config import get_config
@@ -40,7 +40,7 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
     # modified from: https://pytorch.org/tutorials/beginner/transfer_learning_tutorial.html
     start_time = time.time()
     model.eval()   # Set model to evaluate mode
-    
+
     target_tokens_list = []
     target_string_list = []
     pred_tokens_list = []
@@ -56,27 +56,27 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
             input_masks_batch = input_masks.to(device) # B, 56
             target_ids_batch = target_ids.to(device) # B, 56
             input_mask_invert_batch = input_mask_invert.to(device) # B, 56
-            
+
             target_tokens = tokenizer.convert_ids_to_tokens(target_ids_batch[0].tolist(), skip_special_tokens = True)
             target_string = tokenizer.decode(target_ids_batch[0], skip_special_tokens = True)
             # print('target ids tensor:',target_ids_batch[0])
             # print('target ids:',target_ids_batch[0].tolist())
             # print('target tokens:',target_tokens)
             # print('target string:',target_strininvert.to(device) # B, 56
-            
+
             f.write(f'target string: {target_string}\n')
 
             # add to list for later calculate bleu metric
             target_tokens_list.append([target_tokens])
             target_string_list.append(target_string)
-            
+
             """replace padding ids in target_ids with -100"""
-            target_ids_batch[target_ids_batch == tokenizer.pad_token_id] = -100 
+            target_ids_batch[target_ids_batch == tokenizer.pad_token_id] = -100
 
             # target_ids_batch_label = target_ids_batch.clone().detach()
             # target_ids_batch_label[target_ids_batch_label == tokenizer.pad_token_id] = -100
 
-            # Original code 
+            # Original code
             seq2seqLMoutput = model(input_embeddings_batch, input_masks_batch, input_mask_invert_batch, target_ids_batch) # (batch, time, n_class)
             logits_previous = seq2seqLMoutput.logits
             probs_previous = logits_previous[0].softmax(dim = 1)
@@ -94,7 +94,7 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
             pred_tokens_previous = tokenizer.convert_ids_to_tokens(truncated_prediction_previous, skip_special_tokens = True)
             pred_tokens_list_previous.append(pred_tokens_previous)
             pred_string_list_previous.append(predicted_string_previous)
-            
+
 
             # Modify code
             predictions=model.generate(input_embeddings_batch, input_masks_batch, input_mask_invert_batch, target_ids_batch,
@@ -107,17 +107,17 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
                                        # do_sample=True, top_k=15,temperature=0.5,num_return_sequences=5,
                                        # early_stopping=True
                                        )
-            
+
             predicted_string=tokenizer.batch_decode(predictions, skip_special_tokens=True)[0]
             # predicted_string=predicted_string.squeeze()
-            
+
             predictions=tokenizer.encode(predicted_string)
             # print('predicted string:',predicted_string)
             f.write(f'predicted string: {predicted_string}\n')
             f.write(f'################################################\n\n\n')
 
             # convert to int list
-            # predictions = predictions.tolist() # 이미 list 형식이다. 
+            # predictions = predictions.tolist() # 이미 list 형식이다.
             truncated_prediction = []
             for t in predictions:
                 if t != tokenizer.eos_token_id:
@@ -133,7 +133,7 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
             # print('################################################')
             # print()
     # print(f"pred_string_list : {pred_string_list}")
-    
+
     """ calculate corpus bleu score """
     weights_list = [(1.0,),(0.5,0.5),(1./3.,1./3.,1./3.),(0.25,0.25,0.25,0.25)]
     corpus_bleu_scores = []
@@ -149,7 +149,7 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
 
 
     """ calculate sacre bleu score """
-    
+
     reference_list = [[item] for item in target_string_list]
 
     #print(f'ref: {reference_list}')
@@ -163,7 +163,7 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
     print()
     """ calculate rouge score """
     rouge = Rouge()
-    
+
     # pred_string_list = [item for sublist in pred_string_list for item in sublist]
     # pred_string_list = [item for sublist in pred_string_list for item in sublist]
     # pred_string_list_previous = [item for sublist in pred_string_list_previous for item in sublist]
@@ -195,7 +195,7 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
     wer_scores_previous = wer_metric.compute(predictions=pred_string_list_previous, references=target_string_list)
     print("WER score:", wer_scores)
     print("WER score with tf:", wer_scores_previous)
-    
+
 
     """ calculate CER score """
     cer_scores = cer_metric.compute(predictions=pred_string_list, references=target_string_list)
@@ -232,7 +232,7 @@ def eval_model(dataloaders, device, tokenizer, criterion, model, output_all_resu
 
 
 
-if __name__ == '__main__': 
+if __name__ == '__main__':
     batch_size = 1
     ''' get args'''
     args = get_config('eval_decoding')
@@ -250,12 +250,12 @@ if __name__ == '__main__':
     print(f'[INFO]eeg type: {eeg_type_choice}')
     bands_choice = training_config['eeg_bands']
     print(f'[INFO]using bands: {bands_choice}')
-    
+
     dataset_setting = 'unique_sent'
 
     task_name = training_config['task_name']
     model_name = training_config['model_name']
-    
+
 
     if test_input == 'EEG' and train_input=='EEG':
         print("EEG and EEG")
@@ -279,11 +279,11 @@ if __name__ == '__main__':
 
     ''' set up device '''
     # use cuda
-    if torch.cuda.is_available():  
+    if torch.cuda.is_available():
         dev = 0
-    else:  
+    else:
         dev = "cpu"
-    # CUDA_VISIBLE_DEVICES=0,1,2,3  
+    # CUDA_VISIBLE_DEVICES=0,1,2,3
     device = torch.device(dev)
     print(f'[INFO]using device {dev}')
 
@@ -308,13 +308,13 @@ if __name__ == '__main__':
         with open(dataset_path_taskNRv2, 'rb') as handle:
             whole_dataset_dicts.append(pickle.load(handle))
     print()
-    
-    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'BrainTranslatorBaseline']:
+
+    if model_name in ['BrainTranslator','BrainTranslatorNaive', 'BrainTranslatorBaseline', 'BrainTranslatorV2']:
         tokenizer = BartTokenizer.from_pretrained('facebook/bart-large')
 
     elif model_name == 'PegasusTranslator':
         tokenizer = PegasusTokenizer.from_pretrained('google/pegasus-xsum')
-    
+
     elif model_name == 'T5Translator':
         tokenizer = T5Tokenizer.from_pretrained("t5-large")
         # tokenizer.set_prefix_tokens(language='english')
@@ -340,7 +340,7 @@ if __name__ == '__main__':
 
     dataset_sizes = {"test_set":len(test_set)}
     print('[INFO]test_set size: ', len(test_set))
-    
+
     # dataloaders
     test_dataloader = DataLoader(test_set, batch_size = batch_size, shuffle=False, num_workers=1)
 
@@ -348,7 +348,7 @@ if __name__ == '__main__':
 
     ''' set up model '''
     checkpoint_path = args['checkpoint_path']
-    
+
     if model_name == 'BrainTranslator':
         pretrained_bart = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
         model = BrainTranslator(pretrained_bart, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
@@ -361,18 +361,22 @@ if __name__ == '__main__':
         pretrained_bart = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
         model = BrainTranslatorNaive(pretrained_bart, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
 
+    elif model_name == 'BrainTranslatorV2':
+        pretrained_bart = BartForConditionalGeneration.from_pretrained('facebook/bart-large')
+        model = BrainTranslatorV2(pretrained_bart, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
+
     elif model_name == 'BertGeneration':
         pretrained = BertGenerationDecoder.from_pretrained('google-bert/bert-large-uncased', is_decoder = True)
         model = BrainTranslator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
-        
+
     elif model_name == 'PegasusTranslator':
         pretrained = PegasusForConditionalGeneration.from_pretrained('google/pegasus-xsum')
         model = BrainTranslator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
-    
+
     elif model_name == 'T5Translator':
         pretrained = T5ForConditionalGeneration.from_pretrained("t5-large")
         model = T5Translator(pretrained, in_feature = 105*len(bands_choice), decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048)
-    
+
 
     state_dict = torch.load(checkpoint_path)
     new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
@@ -387,8 +391,8 @@ if __name__ == '__main__':
 
     # model.load_state_dict(torch.load(checkpoint_path))
     model.to(device)
-    
+
     criterion = nn.CrossEntropyLoss()
-    
+
     ''' eval '''
     eval_model(dataloaders, device, tokenizer, criterion, model, output_all_results_path = output_all_results_path, score_results=score_results)

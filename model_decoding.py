@@ -9,16 +9,22 @@ import numpy as np
 class BrainTranslator(nn.Module):
     def __init__(self, pretrained_layers, in_feature = 840, decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=0.1):
         super(BrainTranslator, self).__init__()
-        
+
         self.pretrained = pretrained_layers
-        # additional transformer encoder, following BART paper about 
-        self.positional_encoding = PositionalEncoding(in_feature, dropout=dropout)
+        # additional transformer encoder, following BART paper about
+        # self.positional_encoding = PositionalEncoding(in_feature, dropout=dropout)
+
+        # Learned Positional Embedding
+        # max_len=64 is sufficient cover for EEG sequences (Data limit is 56 words)
+        self.pos_embedding = nn.Parameter(torch.randn(1, 64, in_feature))
+        self.dropout = nn.Dropout(p=dropout)
         self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead,  dim_feedforward = additional_encoder_dim_feedforward, batch_first=True, dropout=dropout)
-        self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=3) # Reduced to 3 layers
-        
+        self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=6) # 6 Layers (High Capacity)
+
         # print('[INFO]adding positional embedding')
         # self.positional_embedding = PositionalEncoding(in_feature)
 
+        self.layer_norm = nn.LayerNorm(in_feature)
         self.fc1 = nn.Linear(in_feature, decoder_embedding_size)
 
     def addin_forward(self,input_embeddings_batch,  input_masks_invert):
@@ -27,12 +33,17 @@ class BrainTranslator(nn.Module):
         """input_masks_invert: 1 is masked, 0 is not masked"""
 
         # Add positional encoding
-        input_embeddings_batch = self.positional_encoding(input_embeddings_batch)
+        # Add learned positional encoding
+        # Trim pos_embedding to match input sequence length
+        seq_len = input_embeddings_batch.size(1)
+        input_embeddings_batch = input_embeddings_batch + self.pos_embedding[:, :seq_len, :]
+        input_embeddings_batch = self.dropout(input_embeddings_batch)
 
         # use src_key_padding_masks
         encoded_embedding = self.additional_encoder(input_embeddings_batch, src_key_padding_mask=input_masks_invert)
 
         # encoded_embedding = self.additional_encoder(input_embeddings_batch)
+        encoded_embedding = self.layer_norm(encoded_embedding)
         encoded_embedding = F.leaky_relu(self.fc1(encoded_embedding)) # Changed to LeakyReLU
         return encoded_embedding
 
@@ -75,7 +86,7 @@ class BrainTranslator(nn.Module):
         # print(f'forward:{input_embeddings_batch.shape,input_masks_batch.shape,input_masks_invert.shape,target_ids_batch_converted.shape,encoded_embedding.shape}')
         out = self.pretrained(inputs_embeds = encoded_embedding, attention_mask = input_masks_batch,
                               return_dict = True, labels = target_ids_batch_converted)
-        
+
         return out
 
 
@@ -83,12 +94,12 @@ class BrainTranslator(nn.Module):
 class BrainTranslatorBaseline(nn.Module):
     def __init__(self, pretrained_layers, in_feature = 840, decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, dropout=0.1):
         super(BrainTranslatorBaseline, self).__init__()
-        
+
         self.pretrained = pretrained_layers
-        # additional transformer encoder, following BART paper about 
+        # additional transformer encoder, following BART paper about
         self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead,  dim_feedforward = additional_encoder_dim_feedforward, batch_first=True, dropout=dropout)
         self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=6)
-        
+
         # print('[INFO]adding positional embedding')
         # self.positional_embedding = PositionalEncoding(in_feature)
 
@@ -145,7 +156,84 @@ class BrainTranslatorBaseline(nn.Module):
         encoded_embedding=self.addin_forward(input_embeddings_batch, input_masks_invert)
         out = self.pretrained(inputs_embeds = encoded_embedding, attention_mask = input_masks_batch,
                               return_dict = True, labels = target_ids_batch_converted)
-        
+
+        return out
+
+
+""" V2 architecture: Learned PE (properly scaled), ReLU, No pre-projection LayerNorm """
+class BrainTranslatorV2(nn.Module):
+    def __init__(self, pretrained_layers, in_feature = 840, decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048, max_seq_len=64, dropout=0.1):
+        super(BrainTranslatorV2, self).__init__()
+
+        self.pretrained = pretrained_layers
+
+        # Learned Positional Embedding — properly scaled (0.02 std, matching transformer conventions)
+        self.pos_embedding = nn.Embedding(max_seq_len, in_feature)
+        nn.init.normal_(self.pos_embedding.weight, mean=0.0, std=0.02)
+
+        self.dropout = nn.Dropout(p=dropout)
+        self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead, dim_feedforward=additional_encoder_dim_feedforward, batch_first=True, dropout=dropout)
+        self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=6)
+
+        self.fc1 = nn.Linear(in_feature, decoder_embedding_size)
+
+    def addin_forward(self, input_embeddings_batch, input_masks_invert):
+        """input_embeddings_batch: batch_size*Seq_len*840"""
+        """input_mask: 1 is not masked, 0 is masked"""
+        """input_masks_invert: 1 is masked, 0 is not masked"""
+
+        # Add learned positional encoding (properly scaled via nn.Embedding)
+        seq_len = input_embeddings_batch.size(1)
+        positions = torch.arange(seq_len, device=input_embeddings_batch.device)
+        input_embeddings_batch = input_embeddings_batch + self.pos_embedding(positions)
+        input_embeddings_batch = self.dropout(input_embeddings_batch)
+
+        # Transformer encoder with padding mask
+        encoded_embedding = self.additional_encoder(input_embeddings_batch, src_key_padding_mask=input_masks_invert)
+
+        # GELU activation (matches BART's internal activation function)
+        encoded_embedding = F.gelu(self.fc1(encoded_embedding))
+        return encoded_embedding
+
+    @torch.no_grad()
+    def generate(
+            self,
+            input_embeddings_batch, input_masks_batch, input_masks_invert, target_ids_batch_converted,
+            generation_config = None,
+            logits_processor = None,
+            stopping_criteria = None,
+            prefix_allowed_tokens_fn= None,
+            synced_gpus= None,
+            assistant_model = None,
+            streamer= None,
+            negative_prompt_ids= None,
+            negative_prompt_attention_mask = None,
+            **kwargs,
+    ):
+        encoded_embedding=self.addin_forward(input_embeddings_batch, input_masks_invert)
+        output=self.pretrained.generate(
+            inputs_embeds = encoded_embedding,
+            attention_mask = input_masks_batch[:,:encoded_embedding.shape[1]],
+            labels = target_ids_batch_converted,
+            return_dict = True,
+            generation_config=generation_config,
+            logits_processor=logits_processor,
+            stopping_criteria=stopping_criteria,
+            prefix_allowed_tokens_fn=prefix_allowed_tokens_fn,
+            synced_gpus=synced_gpus,
+            assistant_model=assistant_model,
+            streamer=streamer,
+            negative_prompt_ids=negative_prompt_ids,
+            negative_prompt_attention_mask=negative_prompt_attention_mask,
+            **kwargs,)
+
+        return output
+
+    def forward(self, input_embeddings_batch, input_masks_batch, input_masks_invert, target_ids_batch_converted):
+        encoded_embedding=self.addin_forward(input_embeddings_batch, input_masks_invert)
+        out = self.pretrained(inputs_embeds = encoded_embedding, attention_mask = input_masks_batch,
+                              return_dict = True, labels = target_ids_batch_converted)
+
         return out
 
 
@@ -155,16 +243,16 @@ from transformers import T5Tokenizer
 class T5Translator(nn.Module):
     def __init__(self, pretrained_layers, in_feature = 840, decoder_embedding_size = 1024, additional_encoder_nhead=8, additional_encoder_dim_feedforward = 2048):
         super(T5Translator, self).__init__()
-        
+
         self.pretrained = pretrained_layers
 
         self.tokenizer = T5Tokenizer.from_pretrained("t5-large")
-        
-        # additional transformer encoder, following BART paper about 
+
+        # additional transformer encoder, following BART paper about
         self.positional_encoding = PositionalEncoding(in_feature)
         self.additional_encoder_layer = nn.TransformerEncoderLayer(d_model=in_feature, nhead=additional_encoder_nhead,  dim_feedforward = additional_encoder_dim_feedforward, batch_first=True)
         self.additional_encoder = nn.TransformerEncoder(self.additional_encoder_layer, num_layers=3) # Reduced to 3 layers
-        
+
         # print('[INFO]adding positional embedding')
         # self.positional_embedding = PositionalEncoding(in_feature)
 
@@ -230,7 +318,7 @@ class T5Translator(nn.Module):
 
     def forward(self, input_embeddings_batch, input_masks_batch, input_masks_invert, target_ids_batch_converted):
         encoded_embedding=self.addin_forward(input_embeddings_batch, input_masks_invert)
-        
+
         # task definition
         input_ids = self.tokenizer("transcribe in English: ", return_tensors="pt").input_ids.to(encoded_embedding.device)
         self.task_embedding = self.pretrained.shared(input_ids).to(encoded_embedding.device)
@@ -256,7 +344,7 @@ class BrainTranslatorNaive(nn.Module):
         """input_mask: 1 is not masked, 0 is masked"""
         """input_masks_invert: 1 is masked, 0 is not masked"""
         encoded_embedding = F.relu(self.fc1(input_embeddings_batch))
-        out = self.pretrained(inputs_embeds = encoded_embedding, attention_mask = input_masks_batch, return_dict = True, labels = target_ids_batch_converted)                    
+        out = self.pretrained(inputs_embeds = encoded_embedding, attention_mask = input_masks_batch, return_dict = True, labels = target_ids_batch_converted)
         return out
 
 
@@ -333,13 +421,13 @@ class ContrastiveBrainTextEncoder(nn.Module):
         self.EEG_Encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=6)
         self.EEG_pooler = Pooler(in_feature)
         self.ln_final = nn.LayerNorm(in_feature) # to be considered
-        
+
         # project to text embedding
         self.EEG_projection = nn.Parameter(torch.empty(in_feature, embed_dim))
-        
+
         # Text Encoder
         self.TextEncoder = pretrained_text_encoder
-        
+
         # learned temperature parameter
         self.logit_scale = nn.Parameter(torch.ones([]) * np.log(1 / 0.07))
 
@@ -356,13 +444,13 @@ class ContrastiveBrainTextEncoder(nn.Module):
 
         # get text feature embedding
         Text_features = self.TextEncoder(input_ids = input_ids, attention_mask = input_text_attention_masks, return_dict = True).pooler_output # [N, 768]
-        
+
         # normalized features
         EEG_features = EEG_features / EEG_features.norm(dim=-1, keepdim=True) # [N, 768]
         Text_features = Text_features / Text_features.norm(dim=-1, keepdim=True) # [N, 768]
 
         # cosine similarity as logits
-        logit_scale = self.logit_scale.exp() 
+        logit_scale = self.logit_scale.exp()
         logits_per_EEG = logit_scale * EEG_features @ Text_features.t() # [N, N]
         logits_per_text = logit_scale * Text_features @ EEG_features.t() # [N, N]
 

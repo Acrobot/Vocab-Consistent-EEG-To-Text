@@ -3,7 +3,7 @@ import sys
 import os
 import argparse
 
-def parse_metrics(filepath):
+def parse_metrics(filepath, use_tf=False):
     """Parses the metrics from the result file."""
     # Initialize metrics with None
     metrics = {
@@ -32,8 +32,10 @@ def parse_metrics(filepath):
             else:
                 text = content
 
+            tf_suffix = '_with_tf' if use_tf else ''
+
             # Parse BLEU scores (list format)
-            bleu_match = re.search(r"corpus_bleu_score = \[([\d\., e\-\+]+)\]", text)
+            bleu_match = re.search(fr"corpus_bleu_score{tf_suffix} = \[([\d\., e\-\+]+)\]", text)
             if bleu_match:
                 bleus = [float(x.strip()) for x in bleu_match.group(1).split(',')]
                 if len(bleus) >= 4:
@@ -43,7 +45,7 @@ def parse_metrics(filepath):
                     metrics['BLEU-4'] = bleus[3] * 100
 
             # Parse SacreBLEU score
-            sacre_match = re.search(r"sacre_blue_score = \{.*?'score': ([\d\.]+)", text)
+            sacre_match = re.search(fr"sacre_blue_score{tf_suffix} = \{{.*?'score': ([\d\.]+)", text)
             if sacre_match:
                 metrics['SacreBLEU'] = float(sacre_match.group(1))
 
@@ -52,13 +54,14 @@ def parse_metrics(filepath):
                 upper_key = key.upper()
                 for m_type in ['p', 'r', 'f']:
                     upper_m = m_type.upper()
-                    # Example: 'rouge-1': {'f': 0.12, 'p': 0.11, 'r': 0.13}
-                    m_match = re.search(fr"'rouge-{key}': \{{.*?'{m_type}': ([\d\.]+)", text)
+                    # Updated regex to correctly scope target variables whether tf_suffix is present or not
+                    # Ex: rouge_scores_with_tf = {'rouge-1': {'f': 0.12, 'p': 0.11, 'r': 0.13}...
+                    m_match = re.search(fr"rouge_scores{tf_suffix} = .+'rouge-{key}': \{{[^}}]*?'{m_type}': ([\d\.]+)", text)
                     if m_match:
                         metrics[f'ROUGE-{upper_key}-{upper_m}'] = float(m_match.group(1)) * 100
 
             # Parse WER
-            wer = re.search(r"wer_scores = ([\d\.]+)", text)
+            wer = re.search(fr"wer_scores{tf_suffix} = ([\d\.]+)", text)
             if wer:
                 metrics['WER'] = float(wer.group(1)) * 100
 
@@ -81,7 +84,7 @@ def main():
 
     # Define file paths for all experiments
     files = {
-        'EEG': {
+        'EEG Input Performance': {
             'Our Baseline': 'score_results/optimal_baseline_cohort/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
             'Learned PE': 'score_results/optimal_fixed_cohort/EEG/task1_task2_taskNRv2-BrainTranslator.txt',
             'V2': 'score_results/optimal_v2_cohort/EEG/task1_task2_taskNRv2-BrainTranslatorV2.txt',
@@ -93,7 +96,31 @@ def main():
             'V4 (Baseline+TwoStep+Contr)': 'score_results/v4_baseline_twostep_contrastive_eeg/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
             'V5 Best (Baseline+OneStep+Sweep)': 'score_results/sweep/ihig0y4v/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
         },
-        'Noise': {
+        'Noise Input Performance': {
+            'Our Baseline': 'score_results/optimal_baseline_cohort/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+            'Learned PE': 'score_results/optimal_fixed_cohort/noise/task1_task2_taskNRv2-BrainTranslator-EEG_noise.txt',
+            'V2': 'score_results/optimal_v2_cohort/noise/task1_task2_taskNRv2-BrainTranslatorV2-EEG_noise.txt',
+            'V3 (Contrastive)': 'score_results/optimal_v3_cohort/noise/task1_task2_taskNRv2-BrainTranslatorV2-EEG_noise.txt',
+            'V3 Sweep Best': 'score_results/sweep_v3_best/noise/task1_task2_taskNRv2-BrainTranslatorV2-EEG_noise.txt',
+            'Baseline+Contr λ=0.2': 'score_results/baseline_contrastive/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+            'Baseline+Contr λ=1.0': 'score_results/baseline_contrastive_strong/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+            'Baseline+Contr λ=1.0 (Fixed)': 'score_results/baseline_contrastive_fixed/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+            'V4 (Baseline+TwoStep+Contr)': 'score_results/v4_baseline_twostep_contrastive_eeg/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+            'V5 Best (Baseline+OneStep+Sweep)': 'score_results/sweep/ihig0y4v/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+        },
+        'EEG Input Performance (Teacher Forcing)': {
+            'Our Baseline': 'score_results/optimal_baseline_cohort/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+            'Learned PE': 'score_results/optimal_fixed_cohort/EEG/task1_task2_taskNRv2-BrainTranslator.txt',
+            'V2': 'score_results/optimal_v2_cohort/EEG/task1_task2_taskNRv2-BrainTranslatorV2.txt',
+            'V3 (Contrastive)': 'score_results/optimal_v3_cohort/EEG/task1_task2_taskNRv2-BrainTranslatorV2.txt',
+            'V3 Sweep Best': 'score_results/sweep_v3_best/EEG/task1_task2_taskNRv2-BrainTranslatorV2.txt',
+            'Baseline+Contr λ=0.2': 'score_results/baseline_contrastive/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+            'Baseline+Contr λ=1.0': 'score_results/baseline_contrastive_strong/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+            'Baseline+Contr λ=1.0 (Fixed)': 'score_results/baseline_contrastive_fixed/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+            'V4 (Baseline+TwoStep+Contr)': 'score_results/v4_baseline_twostep_contrastive_eeg/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+            'V5 Best (Baseline+OneStep+Sweep)': 'score_results/sweep/ihig0y4v/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+        },
+         'Noise Input Performance (Teacher Forcing)': {
             'Our Baseline': 'score_results/optimal_baseline_cohort/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
             'Learned PE': 'score_results/optimal_fixed_cohort/noise/task1_task2_taskNRv2-BrainTranslator-EEG_noise.txt',
             'V2': 'score_results/optimal_v2_cohort/noise/task1_task2_taskNRv2-BrainTranslatorV2-EEG_noise.txt',
@@ -125,6 +152,22 @@ def main():
         'ROUGE-L-P': None, 'ROUGE-L-R': None, 'ROUGE-L-F': None,
         'WER': 100.03
     }
+    bart_eeg_tf = {
+        'BLEU-1': 41.22, 'BLEU-2': 24.18, 'BLEU-3': 13.87, 'BLEU-4': 7.77,
+        'SacreBLEU': None,
+        'ROUGE-1-P': 29.52, 'ROUGE-1-R': 36.31, 'ROUGE-1-F': 32.42,
+        'ROUGE-2-P': None, 'ROUGE-2-R': None, 'ROUGE-2-F': None,
+        'ROUGE-L-P': None, 'ROUGE-L-R': None, 'ROUGE-L-F': None,
+        'WER': 75.33
+    }
+    bart_noise_tf = {
+        'BLEU-1': 41.22, 'BLEU-2': 24.18, 'BLEU-3': 13.87, 'BLEU-4': 7.77,
+        'SacreBLEU': None,
+        'ROUGE-1-P': 29.52, 'ROUGE-1-R': 36.32, 'ROUGE-1-F': 32.42,
+        'ROUGE-2-P': None, 'ROUGE-2-R': None, 'ROUGE-2-F': None,
+        'ROUGE-L-P': None, 'ROUGE-L-R': None, 'ROUGE-L-F': None,
+        'WER': 75.31
+    }
 
     # Order of metrics in the table
     metric_keys = [
@@ -135,19 +178,26 @@ def main():
         'WER'
     ]
 
-    for section_name, section_files in files.items():
-        print(f"## {section_name} Input Performance")
+    for list_idx, (section_name, section_files) in enumerate(files.items()):
+        print(f"## {list_idx + 1}. {section_name}")
 
         # 1. Collect all rows for this section
         all_rows = []
 
-        # Add BART as first row
-        bart_results = bart_eeg if section_name == 'EEG' else bart_noise
+        # Determine configuration based on section name
+        use_tf = 'Teacher Forcing' in section_name
+        is_noise = 'Noise' in section_name
+
+        if use_tf:
+            bart_results = bart_noise_tf if is_noise else bart_eeg_tf
+        else:
+            bart_results = bart_noise if is_noise else bart_eeg
+
         all_rows.append(("Original Article (BART)", bart_results))
 
         # Parse all result files
         for model_name, path in section_files.items():
-            all_rows.append((model_name, parse_metrics(path)))
+            all_rows.append((model_name, parse_metrics(path, use_tf=use_tf)))
 
         # 2. Determine best value in each column for highlighting
         best_vals = {}
@@ -156,8 +206,8 @@ def main():
                 # Filter out 'NR' or None values for numerical comparison
                 numerical_vals = [row[1][k] for row in all_rows if isinstance(row[1][k], (int, float))]
                 if numerical_vals:
-                    if k == 'WER':
-                        # Lower is better for WER
+                    if k == 'WER' or k == 'CER':
+                        # Lower is better for WER and CER
                         best_vals[k] = min(numerical_vals)
                     else:
                         # Higher is better for BLEU/ROUGE

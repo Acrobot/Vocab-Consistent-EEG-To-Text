@@ -95,6 +95,7 @@ def main():
             'Baseline+Contr λ=1.0 (Fixed)': 'score_results/baseline_contrastive_fixed/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
             'V4 (Baseline+TwoStep+Contr)': 'score_results/v4_baseline_twostep_contrastive_eeg/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
             'V5 Best (Baseline+OneStep+Sweep)': 'score_results/sweep/ihig0y4v/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+            'Single-Subject ZDM (Sweep)': 'score_results/single_subject_ZDM/ZDM/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
         },
         'Noise Input Performance': {
             'Our Baseline': 'score_results/optimal_baseline_cohort/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
@@ -107,6 +108,7 @@ def main():
             'Baseline+Contr λ=1.0 (Fixed)': 'score_results/baseline_contrastive_fixed/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
             'V4 (Baseline+TwoStep+Contr)': 'score_results/v4_baseline_twostep_contrastive_eeg/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
             'V5 Best (Baseline+OneStep+Sweep)': 'score_results/sweep/ihig0y4v/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+            'Single-Subject ZDM (Sweep)': 'score_results/single_subject_ZDM/ZDM/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
         },
         'EEG Input Performance (Teacher Forcing)': {
             'Our Baseline': 'score_results/optimal_baseline_cohort/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
@@ -119,6 +121,7 @@ def main():
             'Baseline+Contr λ=1.0 (Fixed)': 'score_results/baseline_contrastive_fixed/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
             'V4 (Baseline+TwoStep+Contr)': 'score_results/v4_baseline_twostep_contrastive_eeg/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
             'V5 Best (Baseline+OneStep+Sweep)': 'score_results/sweep/ihig0y4v/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
+            'Single-Subject ZDM (Sweep)': 'score_results/single_subject_ZDM/ZDM/EEG/task1_task2_taskNRv2-BrainTranslatorBaseline.txt',
         },
          'Noise Input Performance (Teacher Forcing)': {
             'Our Baseline': 'score_results/optimal_baseline_cohort/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
@@ -131,6 +134,7 @@ def main():
             'Baseline+Contr λ=1.0 (Fixed)': 'score_results/baseline_contrastive_fixed/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
             'V4 (Baseline+TwoStep+Contr)': 'score_results/v4_baseline_twostep_contrastive_eeg/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
             'V5 Best (Baseline+OneStep+Sweep)': 'score_results/sweep/ihig0y4v/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
+            'Single-Subject ZDM (Sweep)': 'score_results/single_subject_ZDM/ZDM/noise/task1_task2_taskNRv2-BrainTranslatorBaseline-EEG_noise.txt',
         }
     }
 

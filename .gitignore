@@ -175,3 +175,12 @@ debug_scripts/
 metrics_*.csv
 magerit/config.env
 metrics_*.csv
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.blg
+indent.log

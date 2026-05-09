@@ -65,14 +65,24 @@ def _extract_sentences_from_pickle(obj: Any) -> List[str]:
     sentences = []
 
     if isinstance(obj, list):
+        if all(isinstance(item, str) for item in obj):
+            # Flat list of words (DERCo article_*.pkl format)
+            # Reconstruct into sentences of ~20 words
+            words = [w.strip() for w in obj if w.strip()]
+            for i in range(0, len(words), 20):
+                sentence = ' '.join(words[i:i+20])
+                if len(sentence) > 2:
+                    sentences.append(sentence)
+            return sentences
+
         for item in obj:
-            if isinstance(item, str) and len(item.strip()) > 5:
+            if isinstance(item, str) and len(item.strip()) > 1:
                 sentences.append(item.strip())
             elif isinstance(item, dict):
                 for key in ('sentence', 'content', 'text', 'Sentence', 'Content'):
                     if key in item and isinstance(item[key], str):
                         s = item[key].strip()
-                        if len(s) > 5:
+                        if len(s) > 1:
                             sentences.append(s)
                         break
                 else:
@@ -83,7 +93,7 @@ def _extract_sentences_from_pickle(obj: Any) -> List[str]:
                             for w in item['words']
                         ]
                         text = ' '.join(str(w) for w in words if w).strip()
-                        if len(text) > 5:
+                        if len(text) > 1:
                             sentences.append(text)
     elif isinstance(obj, dict):
         for key in ('sentences', 'Sentences', 'items', 'content', 'text'):

@@ -84,6 +84,6 @@ Download the pickle files and place them in:
   ./dataset/ZuCo/task2-NR-2.0/pickle/task2-NR-2.0-dataset.pickle
 
 Then run:
-  python datasets/analyse_multi_dataset.py --datasets zuco \\
+  python dataset_analysis/analyse_multi_dataset.py --datasets zuco \\
       --zuco_dir ./dataset/ZuCo
 """

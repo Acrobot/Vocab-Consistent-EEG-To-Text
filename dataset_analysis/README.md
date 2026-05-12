@@ -1,4 +1,4 @@
-# `datasets/` — Multi-Dataset Analysis Module
+# `dataset_analysis/` — Multi-Dataset Analysis Module
 
 Self-contained extension of the project that applies the **Vocabulary-Consistent
 Partitioning Method** (described in §3 of the paper) to multiple publicly
@@ -13,7 +13,7 @@ and `analyze_token_distribution()` from `../data.py`.
 ## File Structure
 
 ```
-datasets/
+dataset_analysis/
 ├── analyse_multi_dataset.py   ← Main script (run this)
 ├── analysis_engine.py         ← Generic analysis engine (dataset-agnostic)
 ├── adapters/
@@ -32,7 +32,7 @@ Run in fallback/demo mode using built-in text samples:
 
 ```bash
 conda activate EEG-To-Text
-python datasets/analyse_multi_dataset.py
+python dataset_analysis/analyse_multi_dataset.py
 ```
 
 This immediately produces a cross-dataset comparison table showing the
@@ -45,7 +45,7 @@ OOV improvement of the stratified split over sequential splitting.
 ### Step 1 — Get download instructions
 
 ```bash
-python datasets/analyse_multi_dataset.py --download-info
+python dataset_analysis/analyse_multi_dataset.py --download-info
 ```
 
 ### Step 2 — Download (text annotations only, no raw EEG)
@@ -68,7 +68,7 @@ openneuro-py download --dataset ds007629 \
 ### Step 3 — Run the analysis
 
 ```bash
-python datasets/analyse_multi_dataset.py \
+python dataset_analysis/analyse_multi_dataset.py \
     --datasets zuco alice derco roamm \
     --zuco_dir  ./dataset/ZuCo \
     --alice_dir ./dataset/Alice \

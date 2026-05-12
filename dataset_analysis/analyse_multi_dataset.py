@@ -6,16 +6,16 @@ Applies the Vocabulary-Consistent Partitioning Method (described in the paper)
 to multiple publicly available EEG+text datasets and produces a cross-dataset
 comparison table showing OOV improvements.
 
-Self-contained: lives entirely in datasets/, zero changes to the main codebase.
+Self-contained: lives entirely in dataset_analysis/, zero changes to the main codebase.
 Reuses create_stratified_split() and analyze_token_distribution() from data.py.
 
 Usage
 -----
 # Run on all datasets in fallback/demo mode (no data download required):
-  python datasets/analyse_multi_dataset.py
+  python dataset_analysis/analyse_multi_dataset.py
 
 # Run on specific datasets with actual data:
-  python datasets/analyse_multi_dataset.py \\
+  python dataset_analysis/analyse_multi_dataset.py \\
       --datasets zuco alice derco roamm \\
       --zuco_dir  ./dataset/ZuCo \\
       --alice_dir ./dataset/Alice \\
@@ -23,13 +23,13 @@ Usage
       --roamm_dir ./dataset/ROAMM
 
 # Run only on ZuCo + Alice (to verify against existing results):
-  python datasets/analyse_multi_dataset.py \\
+  python dataset_analysis/analyse_multi_dataset.py \\
       --datasets zuco alice \\
       --zuco_dir  ./dataset/ZuCo \\
       --alice_dir ./dataset/Alice
 
 # Show download instructions for all datasets:
-  python datasets/analyse_multi_dataset.py --download-info
+  python dataset_analysis/analyse_multi_dataset.py --download-info
 
 Supported datasets
 ------------------
@@ -54,7 +54,7 @@ import sys
 from typing import Dict, List, Optional, Any
 
 # ── Path setup ─────────────────────────────────────────────────────────────────
-# Allow imports from both the datasets/ package and the project root (for data.py)
+# Allow imports from both the dataset_analysis/ package and the project root (for data.py)
 _here = os.path.dirname(os.path.abspath(__file__))
 _root = os.path.dirname(_here)
 for p in [_here, _root]:

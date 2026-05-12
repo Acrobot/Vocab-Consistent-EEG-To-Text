@@ -385,10 +385,15 @@ if __name__ == '__main__':
     text_unique_split = args.get('text_unique_split', False)
     print(f'[INFO]text_unique_split: {text_unique_split}')
 
+    # Get use_sequential_split option (defaults to False = stratified vocab-consistent split)
+    use_sequential_split = args.get('use_sequential_split', False)
+    use_stratified_split = not use_sequential_split
+    print(f'[INFO]use_sequential_split: {use_sequential_split} (use_stratified_split={use_stratified_split})')
+
     # train dataset
-    train_set = ZuCo_dataset(whole_dataset_dicts, 'train', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input, text_unique_split=text_unique_split)
+    train_set = ZuCo_dataset(whole_dataset_dicts, 'train', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input, text_unique_split=text_unique_split, use_stratified_split=use_stratified_split)
     # dev dataset
-    dev_set = ZuCo_dataset(whole_dataset_dicts, 'dev', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input, text_unique_split=text_unique_split)
+    dev_set = ZuCo_dataset(whole_dataset_dicts, 'dev', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=train_input, text_unique_split=text_unique_split, use_stratified_split=use_stratified_split)
     # test dataset
     # test_set = ZuCo_dataset(whole_dataset_dicts, 'test', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting)
 

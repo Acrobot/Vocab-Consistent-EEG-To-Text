@@ -335,8 +335,13 @@ if __name__ == '__main__':
     else:
         print('[WARNING] No split indices found in training config - using default sequential split')
 
+    # Read use_sequential_split from training config (defaults to False = stratified)
+    use_sequential_split = training_config.get('use_sequential_split', False)
+    use_stratified_split = not use_sequential_split
+    print(f'[INFO]use_sequential_split (from training config): {use_sequential_split}')
+
     # test dataset
-    test_set = ZuCo_dataset(whole_dataset_dicts, 'test', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=test_input, loaded_split_indices=loaded_split_indices)
+    test_set = ZuCo_dataset(whole_dataset_dicts, 'test', tokenizer, subject = subject_choice, eeg_type = eeg_type_choice, bands = bands_choice, setting = dataset_setting, test_input=test_input, loaded_split_indices=loaded_split_indices, use_stratified_split=use_stratified_split)
 
     dataset_sizes = {"test_set":len(test_set)}
     print('[INFO]test_set size: ', len(test_set))

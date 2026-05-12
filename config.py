@@ -42,6 +42,7 @@ def get_config(case):
 
         parser.add_argument('-train_input', '--train_input', help='add noise' ,required=True)
         parser.add_argument('-text_unique', '--text_unique_split', dest='text_unique_split', action='store_true', help='ensure same text never appears in both train and test, even across subjects')
+        parser.add_argument('-seq', '--use_sequential_split', dest='use_sequential_split', action='store_true', default=False, help='use legacy sequential 80/10/10 split (Jo baseline reproduction) instead of the stratified vocabulary-consistent split')
         parser.add_argument('-cl', '--contrastive_lambda', type=float, help='weight for noise-contrastive auxiliary loss (0 = disabled)', default=0.0, required=False)
         args = vars(parser.parse_args())
 

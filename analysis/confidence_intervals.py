@@ -516,7 +516,7 @@ def emit_latex(n_boot: int, seed: int) -> None:
                     if bold and abs(vals[i] - best[i]) < 1e-9
                     else f"{vals[i]:.2f}"
                 )
-                cells.append(f"\\makecell{{{top}\\\\{{\\tiny[{lo[i]:.2f},\\,{hi[i]:.2f}]}}}}")
+                cells.append(f"\\makecell{{{top}\\\\{{\\tiny[{lo[i]:.1f},\\,{hi[i]:.1f}]}}}}")
             print(f"{labels[key]:20s} & " + " & ".join(cells) + " \\\\")
 
     cohort = ["literature", "vocab", "contrastive"]

@@ -9,7 +9,7 @@
 SUBJ="ZDM"
 SAVE_PATH="./checkpoints/decoding/single_subject_ZDM"
 LOG_DIR="./logs/single_subject_ZDM"
-PYTHON_EXE="python"
+PYTHON_EXE="${PYTHON_EXE:-python}"
 
 mkdir -p "$LOG_DIR"
 mkdir -p "$SAVE_PATH"

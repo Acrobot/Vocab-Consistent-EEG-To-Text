@@ -1,0 +1,15 @@
+{
+  "type": "sequential_per_subject_per_dataset",
+  "dataset_order": [
+    "ZuCo 1.0 task1 SR",
+    "ZuCo 1.0 task2 NR",
+    "ZuCo 2.0 taskNRv2"
+  ],
+  "subjects": "ALL",
+  "train": "indices [0, floor(0.8*N))",
+  "dev": "indices [floor(0.8*N), floor(0.8*N)+floor(0.1*N))",
+  "test": "remaining indices",
+  "N": "number of sentence entries for the first selected subject in each input dataset, as implemented in data.py",
+  "filtering": "Exclude None entries and samples rejected by get_input_sample; counts refer to raw split positions before filtering",
+  "status": "Rule verified from source and run config; explicit evaluated record identifiers not yet reconstructed"
+}

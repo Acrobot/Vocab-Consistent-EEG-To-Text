@@ -1,0 +1,29 @@
+{
+  "batch_size": 8,
+  "contrastive_lambda": 0.329048196487127,
+  "cuda": "cuda:0",
+  "dropout_rate": 0.25306155198637037,
+  "eeg_bands": [
+    "_t1",
+    "_t2",
+    "_a1",
+    "_a2",
+    "_b1",
+    "_b2",
+    "_g1",
+    "_g2"
+  ],
+  "eeg_type": "GD",
+  "learning_rate_step1": "2e-05",
+  "learning_rate_step2": 0.0004851820064384097,
+  "load_step1_checkpoint": false,
+  "model_name": "BrainTranslatorBaseline",
+  "num_epoch_step1": 20,
+  "num_epoch_step2": 30,
+  "skip_step_one": true,
+  "subjects": "ALL",
+  "task_name": "task1_task2_taskNRv2",
+  "text_unique_split": false,
+  "train_input": "EEG",
+  "use_random_init": false
+}

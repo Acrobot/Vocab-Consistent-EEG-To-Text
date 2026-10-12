@@ -21,9 +21,9 @@
 
 set -e
 
-WANDB_EXE="wandb"
-PROJECT="Vocab-Consistent-EEG-To-Text"
-ENTITY="YOUR_WANDB_ENTITY"
+WANDB_EXE="${WANDB_EXE:-wandb}"
+PROJECT="${WANDB_PROJECT:-Vocab-Consistent-EEG-To-Text}"
+ENTITY="${WANDB_ENTITY:?Set WANDB_ENTITY to your W&B account or team}"
 N_TRIALS=8
 CONFIG_YAML="scripts/sweep_baseline_nocontrastive_config.yaml"
 

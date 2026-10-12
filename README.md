@@ -1,109 +1,73 @@
-The **main branch** contains the final code for our "Are EEG-to-Text Models Working?" paper. 
+# Vocab-Consistent-EEG-To-Text
 
-Accepted by [IJCAI workshop 2024](https://github.com/user-attachments/files/16624318/IJCAI_hyejeongjo_poster_Final.pdf)
+Vocabulary-consistent evaluation and contrastive learning for EEG-to-text generation on ZuCo. This repository contains the decoding implementation, dataset preprocessing, evaluation and statistical analysis.
 
-If you have any questions, you can write them in the Issues section or email Hyejeong Jo at girlsending0@khu.ac.kr.
+## Provenance
 
-check our new paper with full detailed comparison of different models on this task at [https://arxiv.org/abs/2405.06459](https://arxiv.org/abs/2405.06459)
+Based on [NeuSpeech/EEG-To-Text](https://github.com/NeuSpeech/EEG-To-Text) and [MikeWangWZHL/EEG-To-Text](https://github.com/MikeWangWZHL/EEG-To-Text). Cite Wang & Ji (AAAI 2022), *Open Vocabulary Electroencephalography-to-Text Decoding and Zero-Shot Sentiment Classification*, and Jo et al., *Are EEG-to-Text Models Working?* / *Evaluating EEG-to-text models through noise-based performance analysis* (Scientific Reports, DOI 10.1038/s41598-025-29587-x), alongside the associated article when available.
 
-overview
-![image](https://github.com/NeuSpeech/EEG-To-Text/assets/151606332/57212488-b75f-44c7-a265-e2a51483e9f5)
+Upstream licensing terms have not been explicitly established. No blanket open-source license is assigned to inherited code; upstream attribution is retained. Third-party libraries, pretrained models and datasets have their own terms.
 
-performance
-![image](https://github.com/NeuSpeech/EEG-To-Text/assets/151606332/df58870c-5277-4935-8c66-15efd58e9283)
+## Scope and history
 
+The relevant original Git history is retained, with manuscripts/docs, datasets, checkpoints and generated artifacts removed throughout history. Empty commits are pruned and hashes consequently differ from the working repository. Original author names, commit email addresses and dates are preserved. This is a prepared research release, not a claim of complete end-to-end validation.
 
+## Setup
 
-# Correction on [(AAAI 2022) Open Vocabulary EEG-To-Text Decoding and Zero-shot sentiment classification](https://arxiv.org/abs/2112.02690)
-# results and code is updated on **master** branch
-# results and code is updated on **master** branch
-# results and code is updated on **master** branch
-**First of all, we are not pointing at others, we do this correction due to no offense, but a kind reminder of being careful of the string generation process. 
-We repsect Mr. Wang very much, and appreciate his great contribution in this area.**
+The recorded working environment is provided in `environment_working_bart.yaml`; it contains historical exact pins and may require platform-specific adjustments. The original environment files are retained for provenance.
 
-After scrutilizing [the original code shared by Wang Zhenhailong](https://github.com/MikeWangWZHL/EEG-To-Text), we discovered that the eval method have an unintentional but very serious mistake in generating predicted strings, which is using teacher forcing implicitly. 
-
-The code which reaches my concern is:
-
-
-```python
-seq2seqLMoutput = model(input_embeddings_batch, input_masks_batch, input_mask_invert_batch, target_ids_batch)
-logits = seq2seqLMoutput.logits # bs*seq_len*voc_sz
-probs = logits[0].softmax(dim = 1)
-values, predictions = probs.topk(1)
-predictions = torch.squeeze(predictions)
-predicted_string = tokenizer.decode(predictions) 
+```bash
+conda env create -f environment.yml
+conda activate vocab-consistent-eeg-to-text
 ```
 
-Therefore resulting in [predictions like below](https://github.com/MikeWangWZHL/EEG-To-Text/blob/main/results/task1_task2_taskNRv2-BrainTranslator_skipstep1-all_generation_results-7_22.txt#L61):
+Activate the intended environment before running Python/shell entry points. Sweep scripts use the active interpreter. Set `WANDB_ENTITY` and optionally `WANDB_PROJECT` for online training/sweeps. Do not commit API keys; authenticate locally with `wandb login`.
 
-```
-target string: It isn't that Stealing Harvard is a horrible movie -- if only it were that grand a failure!
-predicted string:  was't a the. is was a bad place, it it it were a.. movie.
-################################################
+## Data
 
+Download the official [ZuCo 1.0](https://osf.io/q3zws/) and [ZuCo 2.0](https://osf.io/2urht/) releases. Place their Matlab files under `dataset/ZuCo/task1-SR/Matlab_files`, `task2-NR/Matlab_files`, `task3-TSR/Matlab_files` if needed, and `task2-NR-2.0/Matlab_files`. Preprocess with:
 
-target string: It just doesn't have much else... especially in a moral sense.
-predicted string:  was so't work the to to and not the country sense.
-################################################
-
-
-target string: Those unfamiliar with Mormon traditions may find The Singles Ward occasionally bewildering.
-predicted string:  who with the history may be themselves Mormoning''s amusingering.
-################################################
-
-
-target string: Viewed as a comedy, a romance, a fairy tale, or a drama, there's nothing remotely triumphant about this motion picture.
-predicted string:  the from a whole, it film, and comedy tale, and a tragic, it is nothing quite romantic about it. picture.
-################################################
-
-
-target string: But the talented cast alone will keep you watching, as will the fight scenes.
-predicted string:  the most and of cannot not the entertained. and they the music against.
-################################################
-
-
-target string: It's solid and affecting and exactly as thought-provoking as it should be.
-predicted string:  was a, it, it what it.provoking as it is be.
-################################################
-
-
-target string: Thanks largely to Williams, all the interesting developments are processed in 60 minutes -- the rest is just an overexposed waste of film.
-predicted string:  to to the, the of films and in in in a minutes. and longest is a a afteragerposure, of time time
-################################################
-
-
-target string: Cantet perfectly captures the hotel lobbies, two-lane highways, and roadside cafes that permeate Vincent's days
-predicted string: urtor was describes the spirit'sies and the ofstory streets, and the parking of areate the's life.</s>'sgggggggg,,,,,,,,,,,,,,</s>,,,,,
-################################################
-
-
-target string: An important movie, a reminder of the power of film to move us and to make us examine our values.
-predicted string: nie part in " classic of the importance of the, shape people, our make us think our lives,
-################################################
-
-
-target string: Too much of this well-acted but dangerously slow thriller feels like a preamble to a bigger, more complicated story, one that never materializes.
-predicted string:  bad of a is-known film not over- is like a film-ble to a much, more dramatic story. which that is endsizes.
+```bash
+bash scripts/prepare_dataset.sh
 ```
 
-In addition, we noticed that some people are using it as code base which generates concerning results. We are not condemning these researchers, we just want to notice them and maybe we can do something together to resolve this problem. 
+This repository does not redistribute raw EEG, reference-sentence text or prediction dumps. The `dataset_analysis` package provides the additional OOV comparison tooling; see its README for Alice EEG, DERCo and ROAMM sources.
 
-[BELT Bootstrapping Electroencephalography-to-Language Decoding and Zero-Shot SenTiment Classification by Natural Language Supervision](https://arxiv.org/pdf/2309.12056)
+## Final paper runs
 
-[Aligning Semantic in Brain and Language: A Curriculum Contrastive Method for Electroencephalography-to-Text Generation](https://ieeexplore.ieee.org/iel7/7333/4359219/10248031.pdf)
+| Model | Run | Configuration |
+|---|---|---|
+| Contrastive | ihig0y4v | configs/contrastive.json |
+| Vocabulary-consistent baseline | 00ksermq | configs/vocab.json |
+| Corrected literature baseline | mymf64l7 | configs/literature.json |
+| Single-subject ZDM | slwo549q | configs/zdm.json |
 
-[UniCoRN: Unified Cognitive Signal ReconstructioN bridging cognitive signals and human language](https://arxiv.org/pdf/2307.05355)
+The three stratified configurations use explicit indices in `splits/`; the literature baseline uses the sequential rule described in `splits/literature_rule.json`. Dataset order is ZuCo 1.0 SR, ZuCo 1.0 NR, ZuCo 2.0 NR. Stored indices precede sample filtering: cohort 11,386/1,341/1,462 and ZDM 598/51/51 train/dev/test positions. Evaluation contains 1,387 stratified-cohort records and 49 ZDM records after filtering.
 
-[Semantic-aware Contrastive Learning for Electroencephalography-to-Text Generation with Curriculum Learning](https://arxiv.org/pdf/2301.09237)
+These configurations were recovered from the original W&B run records, avoiding overwritten loose config files. Contrastive and vocabulary-consistent stored split indices match exactly. Checkpoint hashes and integrity results are in `manifest.json`; weights are not bundled and no download location is claimed yet.
 
-[DeWave: Discrete EEG Waves Encoding for Brain Dynamics to Text Translation](https://arxiv.org/pdf/2309.14030)
+## Recompute reported metrics
 
-We have written a corrected version to use model.generate to evaluate the model, the result is not so good. 
-Basicly, we changed the model_decoding.py and eval_decoding.py to add model.generate for its originally nn.Module class model, and used model.generate to predict strings.
+The `statistics/` files contain per-record sufficient statistics. Python and NumPy suffice to verify the packaged point estimates without EEG datasets or checkpoints:
 
-**We are open to everyone to scrutinize on this corrected code and run the code. Then, we will show the final performance of this model in this repo and formalize a technical paper.**
-# We really appreciate the great contribution made by Mr. Wang, however, we should prevent others from continuing this misunderstanding. 
+```bash
+python analysis/reproduce_metrics.py
+python analysis/confidence_intervals.py analyse --n-boot 2000 --n-ar 10000 --seed 42
+```
 
+Only point estimates were recomputed during release preparation. Confidence intervals/significance can be regenerated with the second command. Preserve per-record order for paired tests. Heavy tokenizer/scoring dependencies are needed only for regenerating sufficient statistics from prediction files, which are not bundled.
 
-This work was supported by the Culture, Sports and Tourism R&D Program through the Korea Creative Content Agency grant funded by the Ministry of Culture, Sports and Tourism (RS-2023-00226263), the Institute for Information & Communications Technology Planning & Evaluation (IITP) grant funded by the Korea government (MSIT) (No. RS-2024-00509257, Global AI Frontier Lab), the Information Technology Research Center (ITRC) support program (IITP-2024-RS-2024-00438239) supervised by the IITP, and the IITP grant funded by the Korea government (MSIT) (No. RS-2022-00155911, Artificial Intelligence Convergence Innovation Human Resources Development, Kyung Hee University).
+## Rerun checkpoint evaluation
+
+Supply a checkpoint listed in `manifest.json`. The following wrapper combines the matching recovered config with its exact stored split and writes an evaluation-only config:
+
+```bash
+python scripts/evaluate_paper_model.py --model contrastive --checkpoint /path/to/model.pt --input EEG
+python scripts/evaluate_paper_model.py --model contrastive --checkpoint /path/to/model.pt --input noise
+```
+
+Use `vocab`, `literature` or `zdm` for the other models. Datasets, compatible dependencies and checkpoints must be supplied separately. GPU inference/training was not rerun during preparation, so the numerical-statistics verification does not establish full end-to-end reproduction.
+
+## Training
+
+Core training is in `train_decoding.py`; sweep definitions and runners are under `scripts/`. For the corrected literature baseline use `sweep_litbaseline_btb_config.yaml`, not the superseded experimental-architecture Jo sweep. Configurations describe the original selected runs; retraining may vary across seeds and software/hardware versions.

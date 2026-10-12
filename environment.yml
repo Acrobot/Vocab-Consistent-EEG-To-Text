@@ -1,4 +1,4 @@
-name: EEGToText
+name: vocab-consistent-eeg-to-text
 channels:
   - pytorch
   - anaconda

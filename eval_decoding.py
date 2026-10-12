@@ -266,6 +266,10 @@ if __name__ == '__main__':
         score_results = f'./score_results/{task_name}-{model_name}-{train_input}_{test_input}.txt'
 
 
+    output_all_results_path = args.get('results_path') or output_all_results_path
+    score_results = args.get('score_results_path') or score_results
+    os.makedirs(os.path.dirname(output_all_results_path) or '.', exist_ok=True)
+
     ''' set random seeds '''
     seed_val = 312  # Match training seed for consistency
     np.random.seed(seed_val)

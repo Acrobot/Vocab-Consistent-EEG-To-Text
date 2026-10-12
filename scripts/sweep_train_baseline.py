@@ -27,7 +27,7 @@ def main():
     os.makedirs(f"{save_path}/best", exist_ok=True)
     os.makedirs(f"{save_path}/last", exist_ok=True)
 
-    python_exe = "python"
+    python_exe = sys.executable
 
     cmd = [
         python_exe, "-u", "train_decoding.py",
@@ -53,7 +53,7 @@ def main():
     print(f"  dropout_rate={dropout_rate}")
     print(f"  learning_rate_step2={lr2}")
 
-    result = subprocess.run(cmd, cwd=".")
+    result = subprocess.run(cmd, cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     sys.exit(result.returncode)
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@
 
 set -e
 
-PYTHON_EXE="python"
+PYTHON_EXE="${PYTHON_EXE:-python}"
 
 # Parse arguments
 CHECKPOINT_FILE="$1"

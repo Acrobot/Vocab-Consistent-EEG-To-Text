@@ -1,0 +1,164 @@
+[
+  {
+    "model": "contrastive",
+    "run": "ihig0y4v",
+    "config_file": "configs/contrastive.json",
+    "split_file": "splits/contrastive.json",
+    "parameters": {
+      "contrastive_lambda": 0.329048196487127,
+      "learning_rate_step2": 0.0004851820064384097,
+      "model_name": "BrainTranslatorBaseline",
+      "subjects": "ALL"
+    },
+    "split_sizes": {
+      "dev": 1341,
+      "test": 1462,
+      "train": 11386
+    },
+    "evaluation": {
+      "EEG": {
+        "records": 1387,
+        "prediction_sha256": "d0e62f576064d721193a4ed85116ef14502f0bf69c5a4d176d9cd53d5bcae914",
+        "token_dump_sha256": "c6146e4b62d072f46ce1d54838c0af0fe5b99b1ff8c715b56889770be9a8f73b"
+      },
+      "noise": {
+        "records": 1387,
+        "prediction_sha256": "72db07fc108fa3176b706bc613a260a94dc4956e6c179c95060f1f6923a2fece",
+        "token_dump_sha256": "4e44983e68eb6f26640a046b3bc5d22a09b3da523f2c6da01a2529aea7bc7d3c"
+      }
+    },
+    "source_config_sha256": "bb67ac1bc1d1dd66b5395f5b280af6df92c6e6c0365de65711a5aa68988b10d0",
+    "checkpoint": {
+      "bytes": 1804685717,
+      "sha256": "600b7f6fc6c2d5f62b19e408705409ac6e6fcf63653fdb95ee72704e49576832",
+      "zip_crc_verified": true,
+      "parameter_name_count": 586,
+      "encoder_keys_present": true,
+      "bart_keys_present": false,
+      "validation": "ZIP CRC and static pickle inspection; not deserialized and no inference rerun",
+      "filename": "task1_task2_taskNRv2_finetune_BrainTranslatorBaseline_skipstep1_b8_20_30_2e-05_0.0004851820064384097_unique_sent_EEG.pt",
+      "included_in_package": false
+    }
+  },
+  {
+    "model": "vocab",
+    "run": "00ksermq",
+    "config_file": "configs/vocab.json",
+    "split_file": "splits/vocab.json",
+    "parameters": {
+      "contrastive_lambda": 0,
+      "learning_rate_step2": 0.0004738147449025178,
+      "model_name": "BrainTranslatorBaseline",
+      "subjects": "ALL",
+      "use_sequential_split": false
+    },
+    "split_sizes": {
+      "dev": 1341,
+      "test": 1462,
+      "train": 11386
+    },
+    "evaluation": {
+      "EEG": {
+        "records": 1387,
+        "prediction_sha256": "dda2c38d59a22cae4f49e5faa243d990f6421380fe3074be255dfca4b71e4e22",
+        "token_dump_sha256": "1d59a2b96206be4d027e95e04eb82c7ea8c77f809f839909423382cf18942ea0"
+      },
+      "noise": {
+        "records": 1387,
+        "prediction_sha256": "3274fa8c4915849a5fad3f9087e9754f0ec892dcebfdee07d9cb039c75ce1b73",
+        "token_dump_sha256": "1926ade96a03514cb0f2451f628ecf1fa300b565133e3321876241866cb318ce"
+      }
+    },
+    "source_config_sha256": "529e4f397c7bb8472c2726e74588897a084084695bdc05408379ab577f9fbbd4",
+    "checkpoint": {
+      "bytes": 1804685717,
+      "sha256": "f025c8af0b0b947ea0311a990983457396a637bac3bfc5324cdb6ad40406a689",
+      "zip_crc_verified": true,
+      "parameter_name_count": 586,
+      "encoder_keys_present": true,
+      "bart_keys_present": false,
+      "validation": "ZIP CRC and static pickle inspection; not deserialized and no inference rerun",
+      "filename": "task1_task2_taskNRv2_finetune_BrainTranslatorBaseline_skipstep1_b8_20_30_2e-05_0.0004738147449025178_unique_sent_EEG.pt",
+      "included_in_package": false
+    }
+  },
+  {
+    "model": "literature",
+    "run": "mymf64l7",
+    "config_file": "configs/literature.json",
+    "split_file": "splits/literature_rule.json",
+    "parameters": {
+      "contrastive_lambda": 0,
+      "learning_rate_step2": 5.06216918154078e-05,
+      "model_name": "BrainTranslatorBaseline",
+      "subjects": "ALL",
+      "use_sequential_split": true
+    },
+    "split_sizes": null,
+    "evaluation": {
+      "EEG": {
+        "records": 1407,
+        "prediction_sha256": "4ce4bd8fad5fc67f72fbcb4635635cfb4e7974d497ef918c53786645d9434f3c",
+        "token_dump_sha256": "85a74878ca3d78feac599611732f7c5b63bd77b90d13eda4ebf4fcd474707b16"
+      },
+      "noise": {
+        "records": 1407,
+        "prediction_sha256": "a18957c3bc6fc451f7c2db05aa094ff3308df10edcd3d7254cedb88e9e8ee613",
+        "token_dump_sha256": "874782728d91b26fe9e2d0261e2b213fdab834eff0e3f58105dd54ba7fc3e8fb"
+      }
+    },
+    "source_config_sha256": "6724b53e105186a807055c4c4858637539ede09c9181fe2197e6389b64f9588b",
+    "checkpoint": {
+      "bytes": 1804685717,
+      "sha256": "646bcd4df7ce5fa14fd18b0e3501061a6e08943212669613af706fb98b5fdc69",
+      "zip_crc_verified": true,
+      "parameter_name_count": 586,
+      "encoder_keys_present": true,
+      "bart_keys_present": false,
+      "validation": "ZIP CRC and static pickle inspection; not deserialized and no inference rerun",
+      "filename": "task1_task2_taskNRv2_finetune_BrainTranslatorBaseline_skipstep1_b8_20_30_2e-05_5.06216918154078e-05_unique_sent_EEG.pt",
+      "included_in_package": false
+    }
+  },
+  {
+    "model": "zdm",
+    "run": "slwo549q",
+    "config_file": "configs/zdm.json",
+    "split_file": "splits/zdm.json",
+    "parameters": {
+      "contrastive_lambda": 0.2106848319166326,
+      "learning_rate_step2": 5.061295065821606e-05,
+      "model_name": "BrainTranslatorBaseline",
+      "subjects": "ZDM"
+    },
+    "split_sizes": {
+      "dev": 51,
+      "test": 51,
+      "train": 598
+    },
+    "evaluation": {
+      "EEG": {
+        "records": 49,
+        "prediction_sha256": "605f8d0b1a476f08b1e605efb175fd65808ae7336ab1add94bac5a0ac6a59701",
+        "token_dump_sha256": "468c68c7ca0b0435553d35a943703451d24d069ca64d3ff0aaf665bea0d681b3"
+      },
+      "noise": {
+        "records": 49,
+        "prediction_sha256": "1ed9a20fab2196c0b38f999c82c713c181da04efd895c41888a442291391f95e",
+        "token_dump_sha256": "4cccdb9f9c9d2028348ac2adc1690ec0140a511bf51f87749fb8e99b73f03dac"
+      }
+    },
+    "source_config_sha256": "792c8dc11f3dac24976388e6984c29f72ade5db0a259fc5bed3ba3bc1fe3873a",
+    "checkpoint": {
+      "bytes": 1804685717,
+      "sha256": "e2ff14e137a01e9c7f4947c90a9b872a161896629b6506892bc0cf764c44f6e5",
+      "zip_crc_verified": true,
+      "parameter_name_count": 586,
+      "encoder_keys_present": true,
+      "bart_keys_present": false,
+      "validation": "ZIP CRC and static pickle inspection; not deserialized and no inference rerun",
+      "filename": "task1_task2_taskNRv2_finetune_BrainTranslatorBaseline_skipstep1_b8_20_30_2e-05_5.061295065821606e-05_unique_sent_EEG.pt",
+      "included_in_package": false
+    }
+  }
+]

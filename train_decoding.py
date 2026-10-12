@@ -542,7 +542,7 @@ if __name__ == '__main__':
 
         if not wandb.run:
             wandb_run_name = f"Subj: {args['subjects']} | {model_name} | {task_name}"
-            wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args, name=wandb_run_name,
+            wandb.init(entity=os.environ.get("WANDB_ENTITY"), project=os.environ.get("WANDB_PROJECT", "Vocab-Consistent-EEG-To-Text"), config=args, name=wandb_run_name,
                        settings=wandb.Settings(init_timeout=300))
 
         # return best loss model from step1 training
@@ -589,7 +589,7 @@ if __name__ == '__main__':
     # Initialize wandb only if not already initialized (step1 may have done it)
     if not wandb.run:
         wandb_run_name = f"Subj: {args['subjects']} | {model_name} | {task_name}"
-        wandb.init(entity="YOUR_WANDB_ENTITY", project="EEG-To-Text", config=args, name=wandb_run_name,
+        wandb.init(entity=os.environ.get("WANDB_ENTITY"), project=os.environ.get("WANDB_PROJECT", "Vocab-Consistent-EEG-To-Text"), config=args, name=wandb_run_name,
                    settings=wandb.Settings(init_timeout=300))
 
     '''main loop'''

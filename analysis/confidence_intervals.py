@@ -42,9 +42,9 @@ from pathlib import Path
 
 DOCS = Path(__file__).resolve().parent
 REPO = DOCS.parent
-BLEU_STATS = DOCS / "ci_stats.json"
-TEXT_STATS = DOCS / "ci_stats2.json"
-SACRE_STATS = DOCS / "ci_stats3.json"
+BLEU_STATS = REPO / "statistics" / "ci_stats.json"
+TEXT_STATS = REPO / "statistics" / "ci_stats2.json"
+SACRE_STATS = REPO / "statistics" / "ci_stats3.json"
 
 # Prediction files per model and input condition. Teacher-forcing outputs live in
 # the same files, so each file yields both the "free" and "tf" regimes.

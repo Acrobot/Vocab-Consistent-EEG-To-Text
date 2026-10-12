@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import sys
 
-REPO_ROOT = "."
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def main():
@@ -42,7 +42,7 @@ def main():
     os.makedirs(os.path.join(save_path_abs, "best"), exist_ok=True)
     os.makedirs(os.path.join(save_path_abs, "last"), exist_ok=True)
 
-    python_exe = "python"
+    python_exe = sys.executable
 
     cmd = [
         python_exe, "-u", "train_decoding.py",

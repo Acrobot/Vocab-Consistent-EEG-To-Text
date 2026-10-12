@@ -177,6 +177,7 @@ magerit/config.env
 metrics_*.csv
 
 # LaTeX build artifacts
+*.abs
 *.aux
 *.fdb_latexmk
 *.fls

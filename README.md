@@ -1,6 +1,6 @@
 # Vocab-Consistent-EEG-To-Text
 
-Vocabulary-consistent evaluation and contrastive learning for EEG-to-text generation on ZuCo. This repository contains the decoding implementation, dataset preprocessing, evaluation and statistical analysis.
+Vocabulary-consistent evaluation and contrastive learning for EEG-to-text generation on ZuCo. This repository contains the decoding implementation, dataset preprocessing, evaluation and statistical analysis for the associated research article.
 
 ## Provenance
 
@@ -10,16 +10,18 @@ Upstream licensing terms have not been explicitly established. No blanket open-s
 
 ## Scope and history
 
-The relevant original Git history is retained, with manuscripts/docs, datasets, checkpoints and generated artifacts removed throughout history. Empty commits are pruned and hashes consequently differ from the working repository. Original author names, commit email addresses and dates are preserved. This is a prepared research release, not a claim of complete end-to-end validation.
+The relevant original Git history is retained, with manuscripts, datasets, checkpoints and generated artifacts removed throughout history. Empty commits are pruned and hashes consequently differ from the working repository. Original author names, commit email addresses and dates are preserved. This is a prepared research release, not a claim of complete end-to-end validation.
 
 ## Setup
 
-The recorded working environment is provided in `environment_working_bart.yaml`; it contains historical exact pins and may require platform-specific adjustments. The original environment files are retained for provenance.
+Use Python 3.9. `environment.yml` installs the original PyTorch 1.9 / CUDA 11.1 stack and the complete direct dependency list in `requirements.txt`. Run the command from the repository root so the requirements path resolves. `environment_working_bart.yaml` records the historical working environment; `environment_original.yml` is upstream provenance, not the recommended setup. GPU drivers must support the selected CUDA runtime.
 
 ```bash
 conda env create -f environment.yml
 conda activate vocab-consistent-eeg-to-text
 ```
+
+For a CPU-only setup, create a Python 3.9 environment, install PyTorch 1.9 for CPU following the PyTorch installation instructions, then run `python -m pip install -r requirements.txt`. The full BART-large paper model is computationally expensive on CPU.
 
 Activate the intended environment before running Python/shell entry points. Sweep scripts use the active interpreter. Set `WANDB_ENTITY` and optionally `WANDB_PROJECT` for online training/sweeps. Do not commit API keys; authenticate locally with `wandb login`.
 
@@ -69,5 +71,30 @@ python scripts/evaluate_paper_model.py --model contrastive --checkpoint /path/to
 Use `vocab`, `literature` or `zdm` for the other models. Datasets, compatible dependencies and checkpoints must be supplied separately. GPU inference/training was not rerun during preparation, so the numerical-statistics verification does not establish full end-to-end reproduction.
 
 ## Training
+
+After downloading and preprocessing the three paper tasks, train the selected contrastive configuration from the repository root:
+
+```bash
+# Disable external experiment logging, or set WANDB_ENTITY for online logging.
+export WANDB_MODE=disabled
+python train_decoding.py \
+  --model_name BrainTranslatorBaseline --task_name task1_task2_taskNRv2 \
+  --one_step --pretrained --not_load_step1_checkpoint \
+  --num_epoch_step1 20 --num_epoch_step2 30 \
+  --learning_rate_step1 0.00002 --learning_rate_step2 0.0004851820064384097 \
+  --dropout_rate 0.25306155198637037 --contrastive_lambda 0.329048196487127 \
+  --batch_size 8 --subjects ALL --train_input EEG \
+  --save_path ./checkpoints/contrastive-retrained
+```
+
+BART-large weights/tokenizer are downloaded from Hugging Face on first use, or must already be cached. Training writes generated configs into `config/decoding/` and weights into the requested checkpoint directory. Choose a new output directory for each run. The entry point creates stratified splits using its recorded seed; exact paper splits are preserved in `splits/` for evaluation. Training does not currently accept saved split files as CLI input. A full paper run used an RTX 4080; suitable GPU memory and substantial training time are required. CPU fallback is supported but impractical for full BART-large training.
+
+To check the training loops without a GPU, datasets, model downloads or external logging:
+
+```bash
+python scripts/smoke_train.py
+```
+
+This runs the real ZuCo sample-loading/batching code and both baseline and contrastive training/validation loops with synthetic features, a tiny tokenizer and a miniature random BART. It checks finite parameters, optimizer updates, checkpoint writing and reload, and removes its temporary outputs. It does not reproduce the paper's metrics or establish full BART-large/GPU readiness.
 
 Core training is in `train_decoding.py`; sweep definitions and runners are under `scripts/`. For the corrected literature baseline use `sweep_litbaseline_btb_config.yaml`, not the superseded experimental-architecture Jo sweep. Configurations describe the original selected runs; retraining may vary across seeds and software/hardware versions.

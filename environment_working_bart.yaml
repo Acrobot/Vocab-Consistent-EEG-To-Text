@@ -263,6 +263,7 @@ dependencies:
   - zstandard=0.23.0=py39hd399759_3
   - zstd=1.5.6=ha6fb4c9_0
   - pip:
+      - iterative-stratification==0.1.9
       - annotated-types==0.7.0
       - anyio==4.11.0
       - async-timeout==4.0.3
